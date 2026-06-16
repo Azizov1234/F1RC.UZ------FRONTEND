@@ -1,0 +1,47 @@
+{
+  "name": "f1rc-uz",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.101.0",
+    "date-fns": "^4.4.0",
+    "framer-motion": "^12.40.0",
+    "lodash": "^4.18.1",
+    "lucide-react": "^1.17.0",
+    "moment": "^2.30.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-hot-toast": "^2.6.0",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.17.0",
+    "recharts": "^3.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/lodash": "^4.17.24",
+    "@types/node": "^25.9.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "@vitejs/plugin-react-swc": "^4.3.1",
+    "autoprefixer": "^10.5.0",
+    "clsx": "^2.1.1",
+    "eslint": "^10.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "postcss": "^8.5.15",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^3.4.19",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.12"
+  }
+}
