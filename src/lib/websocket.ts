@@ -71,10 +71,13 @@ export class F1WebSocketAdapter {
 
   constructor(url?: string) {
     // URL fallback parsing
-    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = import.meta.env.VITE_API_URL
-      ? import.meta.env.VITE_API_URL.replace(/^https?:\/\//, '')
-      : window.location.host;
+    let host = import.meta.env.VITE_API_URL ?? '';
+    if (host.startsWith('/') || !host) {
+      host = '64.226.77.229:8000';
+    } else {
+      host = host.replace(/^https?:\/\//, '');
+    }
+    const wsProto = host === '64.226.77.229:8000' ? 'ws:' : (window.location.protocol === 'https:' ? 'wss:' : 'ws:');
     
     this.url = url ?? `${wsProto}//${host}/ws/race`;
   }

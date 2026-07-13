@@ -1,4 +1,13 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
+
+const getResolvedBaseUrl = (): string => {
+  if (!BASE_URL) return '';
+  if (/^https?:\/\//i.test(BASE_URL)) return BASE_URL;
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+  return `${origin}${BASE_URL.startsWith('/') ? '' : '/'}${BASE_URL}`;
+};
+
+const RESOLVED_BASE_URL = getResolvedBaseUrl();
 const ACCESS_TOKEN_KEY = 'f1rc_access_token';
 const REFRESH_TOKEN_KEY = 'f1rc_refresh_token';
 const LEGACY_TOKEN_KEY = 'f1rc_token';
@@ -101,11 +110,11 @@ export class ApiClient {
 
     let isInternal = true;
     if (path && /^https?:\/\//i.test(path)) {
-      if (!BASE_URL) {
+      if (!RESOLVED_BASE_URL) {
         isInternal = false;
       } else {
         try {
-          isInternal = new URL(path).origin === new URL(BASE_URL).origin;
+          isInternal = new URL(path).origin === new URL(RESOLVED_BASE_URL).origin;
         } catch {
           isInternal = false;
         }
