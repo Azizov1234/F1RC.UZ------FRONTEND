@@ -37,7 +37,7 @@ export default function PageNotFound() {
         </div>
 
         {/* Admin note */}
-        {user?.role === 'admin' || user?.role === 'superadmin' ? (
+        {user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'superadmin' ? (
           <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/20 text-left">
             <p className="text-xs font-semibold text-orange-400 mb-1">Admin eslatma</p>
             <p className="text-xs text-muted-foreground">

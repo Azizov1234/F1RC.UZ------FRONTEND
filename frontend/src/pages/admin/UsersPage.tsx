@@ -1,78 +1,116 @@
-import { useState, useEffect } from 'react';
-import { Search, UserPlus, Filter, Shield, MoreVertical, ChevronDown, Users } from 'lucide-react';
-import { base44, type F1User } from '@/api/base44Client';
-import RoleBadge from '@/components/admin/RoleBadge';
-import StatusBadge from '@/components/admin/StatusBadge';
-import { format } from 'date-fns';
+import { useState } from 'react';
+import { Users, UserPlus } from 'lucide-react';
+import { useUsersQuery } from '@/hooks/api/useUsers';
+import InviteUserModal from '@/components/admin/InviteUserModal';
+import EditUserModal from '@/components/admin/EditUserModal';
+import ViewUserModal from '@/components/admin/ViewUserModal';
+import ConfirmDeleteModal from '@/components/admin/ConfirmDeleteModal';
+import UserFilters from '@/components/admin/UserFilters';
+import UsersTable from '@/components/admin/UsersTable';
+import TablePagination from '@/components/admin/TablePagination';
+import {
+  usersApi,
+  type CreateUserDto,
+  type GetUsersParams,
+  type UpdateUserDto,
+} from '@/api/users.api';
+import type { User, UserRole, UserStatus } from '@/types';
 
-const ALL_ROLES = ['ALL', 'SUPERADMIN', 'ADMIN', 'OPERATOR', 'RACER', 'TEAM_MANAGER', 'VIEWER'];
+type UserRoleFilter = UserRole | 'ALL';
+type UserStatusFilter = UserStatus | 'ALL';
+type UserSortField = NonNullable<GetUsersParams['sortBy']>;
+
+const userRoles: readonly UserRole[] = ['SUPERADMIN', 'ADMIN', 'OPERATOR', 'RACER', 'TEAM_MANAGER'];
+const userStatuses: readonly UserStatus[] = ['ACTIVE', 'INACTIVE', 'BANNED', 'DELETED'];
+const userSortFields: readonly UserSortField[] = ['createdAt', 'fullName', 'lastLoginAt'];
+
+function isUserRoleFilter(value: string): value is UserRoleFilter {
+  return value === 'ALL' || userRoles.some(role => role === value);
+}
+
+function isUserStatusFilter(value: string): value is UserStatusFilter {
+  return value === 'ALL' || userStatuses.some(status => status === value);
+}
+
+function isUserSortField(value: string): value is UserSortField {
+  return userSortFields.some(field => field === value);
+}
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<F1User[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('ALL');
+  const [roleFilter, setRoleFilter] = useState<UserRoleFilter>('ALL');
+  const [statusFilter, setStatusFilter] = useState<UserStatusFilter>('ACTIVE');
+  const [sortBy, setSortBy] = useState<UserSortField>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [limit, setLimit] = useState(20);
+  const [page, setPage] = useState(1);
+
   const [showInvite, setShowInvite] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('user');
   const [inviting, setInviting] = useState(false);
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
+  // View, Edit, Delete states
+  const [selectedUserIdForView, setSelectedUserIdForView] = useState<string | number | null>(null);
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<User | null>(null);
+  const [selectedUserForDelete, setSelectedUserForDelete] = useState<User | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  const loadUsers = async () => {
-    setLoading(true);
-    try {
-      const data = await base44.entities.User.list('-created_date', 50);
-      setUsers(data || []);
-    } catch (e) {
-      setUsers([
-        { id: '1', name: 'Jahongir T.', full_name: 'Jahongir T.', email: 'admin@f1rc.uz', role: 'superadmin', createdAt: '2026-06-01T10:00:00Z', created_date: '2026-06-01T10:00:00Z' },
-        { id: '2', name: 'Sardor M.', full_name: 'Sardor M.', email: 'operator@f1rc.uz', role: 'operator', createdAt: '2026-06-02T11:00:00Z', created_date: '2026-06-02T11:00:00Z' },
-        { id: '3', name: 'Aziz K.', full_name: 'Aziz K.', email: 'manager@f1rc.uz', role: 'team_manager', createdAt: '2026-06-03T12:00:00Z', created_date: '2026-06-03T12:00:00Z' },
-        { id: '4', name: 'Bobur H.', full_name: 'Bobur H.', email: 'racer@f1rc.uz', role: 'racer', createdAt: '2026-06-04T13:00:00Z', created_date: '2026-06-04T13:00:00Z' },
-        { id: '5', name: 'Viewer User', full_name: 'Viewer User', email: 'viewer@f1rc.uz', role: 'viewer', createdAt: '2026-06-05T14:00:00Z', created_date: '2026-06-05T14:00:00Z' },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // React Query Hook with all Swagger parameters
+  const { data, isLoading, refetch } = useUsersQuery({
+    search,
+    role: roleFilter === 'ALL' ? undefined : roleFilter,
+    page,
+    limit,
+    status: statusFilter === 'ALL' ? undefined : statusFilter,
+    sortBy,
+    sortOrder
+  });
 
-  const handleInvite = async () => {
-    if (!inviteEmail) return;
+  const usersList = data?.data || [];
+
+  const handleCreateUser = async (payload: CreateUserDto) => {
     setInviting(true);
     try {
-      await base44.users.inviteUser(inviteEmail, inviteRole);
-    } catch (e) {
-      // Mock invite success fallback
-      const newRole = inviteRole === 'admin' ? 'admin' : 'racer';
-      setUsers(prev => [
-        ...prev,
-        {
-          id: String(prev.length + 1),
-          name: inviteEmail.split('@')[0],
-          full_name: inviteEmail.split('@')[0],
-          email: inviteEmail,
-          role: newRole,
-          createdAt: new Date().toISOString(),
-          created_date: new Date().toISOString()
-        }
-      ]);
-    } finally {
+      await usersApi.createUser(payload);
+      refetch();
       setShowInvite(false);
-      setInviteEmail('');
+    } catch (error: unknown) {
+      console.error('User creation failed', error);
+      throw error;
+    } finally {
       setInviting(false);
     }
   };
 
-  const filtered = users.filter(u => {
-    const matchSearch = !search || 
-      u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-      u.email?.toLowerCase().includes(search.toLowerCase());
-    const matchRole = roleFilter === 'ALL' || u.role?.toUpperCase() === roleFilter;
-    return matchSearch && matchRole;
-  });
+  const handleUpdateUser = async (payload: UpdateUserDto) => {
+    if (!selectedUserForEdit) return;
+    setUpdating(true);
+    try {
+      await usersApi.updateUser(selectedUserForEdit.id, payload);
+      refetch();
+      setSelectedUserForEdit(null);
+    } catch (error: unknown) {
+      console.error('User update failed', error);
+      throw error;
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUserForDelete) return;
+    setDeleting(true);
+    try {
+      await usersApi.deleteUser(selectedUserForDelete.id);
+      refetch();
+      setSelectedUserForDelete(null);
+    } catch (error: unknown) {
+      console.error('User deletion failed', error);
+      throw error;
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -83,138 +121,96 @@ export default function UsersPage() {
             <Users className="w-6 h-6 text-primary" />
             Foydalanuvchilar
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{users.length} ta foydalanuvchi</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {data?.meta?.total ?? usersList.length} ta foydalanuvchi
+          </p>
         </div>
         <button
           onClick={() => setShowInvite(true)}
           className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-heading font-semibold transition-all"
         >
           <UserPlus className="w-4 h-4" />
-          <span className="hidden sm:inline">Taklif qilish</span>
+          <span className="hidden sm:inline">Yaratish</span>
         </button>
       </div>
 
       {/* Invite modal */}
-      {showInvite && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md">
-            <h3 className="font-heading font-bold text-white text-lg mb-4">Foydalanuvchi taklif qilish</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-muted-foreground font-heading uppercase tracking-widest mb-1 block">Email</label>
-                <input
-                  value={inviteEmail}
-                  onChange={e => setInviteEmail(e.target.value)}
-                  placeholder="user@example.com"
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground font-heading uppercase tracking-widest mb-1 block">Rol</label>
-                <select
-                  value={inviteRole}
-                  onChange={e => setInviteRole(e.target.value)}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
-                >
-                  <option value="user">User (Racer)</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-5">
-              <button onClick={() => setShowInvite(false)} className="flex-1 px-4 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:text-white hover:border-white/30 transition-all font-heading">
-                Bekor
-              </button>
-              <button onClick={handleInvite} disabled={inviting || !inviteEmail} className="flex-1 px-4 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 rounded-lg text-sm text-white font-heading font-semibold transition-all">
-                {inviting ? 'Yuborilmoqda...' : 'Yuborish'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <InviteUserModal
+        isOpen={showInvite}
+        onClose={() => setShowInvite(false)}
+        onCreate={handleCreateUser}
+        inviting={inviting}
+      />
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Ism yoki email bo'yicha qidirish..."
-            className="w-full bg-card border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-          />
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {ALL_ROLES.map(r => (
-            <button
-              key={r}
-              onClick={() => setRoleFilter(r)}
-              className={`px-3 py-2 rounded-lg text-xs font-heading font-semibold tracking-wide transition-all ${
-                roleFilter === r ? 'bg-primary text-white' : 'bg-card border border-border text-muted-foreground hover:text-white hover:border-white/20'
-              }`}
-            >
-              {r === 'ALL' ? 'Barchasi' : r}
-            </button>
-          ))}
-        </div>
-      </div>
+      <UserFilters
+        search={search}
+        onSearchChange={val => { setSearch(val); setPage(1); }}
+        roleFilter={roleFilter}
+        onRoleFilterChange={val => {
+          if (isUserRoleFilter(val)) setRoleFilter(val);
+          setPage(1);
+        }}
+        statusFilter={statusFilter}
+        onStatusFilterChange={val => {
+          if (isUserStatusFilter(val)) setStatusFilter(val);
+          setPage(1);
+        }}
+        sortBy={sortBy}
+        onSortByChange={val => {
+          if (isUserSortField(val)) setSortBy(val);
+        }}
+        sortOrder={sortOrder}
+        onSortOrderChange={setSortOrder}
+        limit={limit}
+        onLimitChange={val => { setLimit(val); setPage(1); }}
+      />
 
       {/* Table */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border bg-muted/30">
-                <th className="text-left px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase">Foydalanuvchi</th>
-                <th className="text-left px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase hidden md:table-cell">Email</th>
-                <th className="text-left px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase">Rol</th>
-                <th className="text-left px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase hidden lg:table-cell">Qo'shilgan</th>
-                <th className="text-left px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase">Holat</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                Array(6).fill(0).map((_, i) => (
-                  <tr key={i} className="border-b border-border/50">
-                    <td className="px-5 py-4"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-muted animate-pulse" /><div className="w-28 h-4 bg-muted animate-pulse rounded" /></div></td>
-                    <td className="px-5 py-4 hidden md:table-cell"><div className="w-36 h-4 bg-muted animate-pulse rounded" /></td>
-                    <td className="px-5 py-4"><div className="w-20 h-5 bg-muted animate-pulse rounded" /></td>
-                    <td className="px-5 py-4 hidden lg:table-cell"><div className="w-24 h-4 bg-muted animate-pulse rounded" /></td>
-                    <td className="px-5 py-4"><div className="w-16 h-5 bg-muted animate-pulse rounded-full" /></td>
-                  </tr>
-                ))
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-12 text-muted-foreground font-heading">Foydalanuvchi topilmadi</td></tr>
-              ) : filtered.map((user, i) => (
-                <tr key={user.id} className={`border-b border-border/50 hover:bg-white/2 transition-colors ${i === filtered.length - 1 ? 'border-0' : ''}`}>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-heading font-bold text-primary flex-shrink-0">
-                        {user.full_name?.[0] || user.email?.[0] || '?'}
-                      </div>
-                      <span className="text-sm text-white font-heading font-medium">{user.full_name || 'Nomsiz'}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5 hidden md:table-cell">
-                    <span className="text-sm text-muted-foreground">{user.email}</span>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <RoleBadge role={user.role?.toUpperCase()} />
-                  </td>
-                  <td className="px-5 py-3.5 hidden lg:table-cell">
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {user.created_date ? format(new Date(user.created_date), 'dd.MM.yyyy') : '—'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <StatusBadge status="ACTIVE_USER" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <UsersTable
+        usersList={usersList}
+        isLoading={isLoading}
+        onView={user => setSelectedUserIdForView(user.id)}
+        onEdit={user => setSelectedUserForEdit(user)}
+        onDelete={user => setSelectedUserForDelete(user)}
+      />
+
+      {/* Pagination Controls */}
+      <TablePagination
+        total={data?.meta?.total ?? 0}
+        page={page}
+        limit={limit}
+        totalPages={data?.meta?.totalPages || 1}
+        onPageChange={setPage}
+        isLoading={isLoading}
+        showingCount={usersList.length}
+      />
+
+      {/* View Modal */}
+      <ViewUserModal
+        isOpen={selectedUserIdForView !== null}
+        onClose={() => setSelectedUserIdForView(null)}
+        userId={selectedUserIdForView}
+      />
+
+      {/* Edit Modal */}
+      <EditUserModal
+        isOpen={selectedUserForEdit !== null}
+        onClose={() => setSelectedUserForEdit(null)}
+        user={selectedUserForEdit}
+        onUpdate={handleUpdateUser}
+        updating={updating}
+      />
+
+      {/* Delete Modal */}
+      <ConfirmDeleteModal
+        isOpen={selectedUserForDelete !== null}
+        onClose={() => setSelectedUserForDelete(null)}
+        onConfirm={handleDeleteUser}
+        deleting={deleting}
+        title="Foydalanuvchini o'chirish"
+        message={`Haqiqatan ham "${selectedUserForDelete?.fullName || selectedUserForDelete?.email}" foydalanuvchisini o'chirib tashlamoqchimisiz? Ushbu amalni ortga qaytarib bo'lmaydi.`}
+      />
     </div>
   );
 }

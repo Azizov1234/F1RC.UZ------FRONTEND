@@ -1,178 +1,282 @@
-import { useState } from 'react';
-import { Flag, Play, Square, Plus, Timer, User, Car } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+  CircleStop,
+  Flag,
+  Plus,
+  Search,
+  TimerReset,
+} from 'lucide-react';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { useAuth } from '@/lib/AuthContext';
+import {
+  useCreateRaceSession,
+  useFinishRaceSession,
+  useRaceSessions,
+  useStartRaceSession,
+  useUpdateRaceSessionStatus,
+} from '@/hooks/api/useRaceSessions';
+import type { RaceSessionStatus } from '@/types';
 
-const mockSessions = [
-  { id: 'RS-001', title: 'Formula RC Sprint - Heat 1', event: 'Formula RC Sprint', operator: 'Operator Aliyev', status: 'RUNNING', participants: 8, startedAt: '14:32', duration: '23:14', laps: 5 },
-  { id: 'RS-002', title: 'GT Race Night - Qualifying', event: 'GT Race Night', operator: 'Operator Karimov', status: 'WAITING', participants: 6, startedAt: null, duration: null, laps: 3 },
-  { id: 'RS-003', title: 'Formula RC Sprint - Heat 2', event: 'Formula RC Sprint', operator: 'Operator Aliyev', status: 'FINISHED', participants: 8, startedAt: '15:30', duration: '28:45', laps: 5 },
-  { id: 'RS-004', title: 'Rally Endurance - Main Race', event: 'Rally Endurance', operator: 'Operator Ergashev', status: 'WAITING', participants: 12, startedAt: null, duration: null, laps: 8 },
+const statuses: Array<'ALL' | RaceSessionStatus> = [
+  'ALL',
+  'PENDING',
+  'ONGOING',
+  'PAUSED',
+  'COMPLETED',
+  'CANCELLED',
 ];
 
-const mockResults = [
-  { pos: 1, racer: 'Jahongir T.', vehicle: 'Ferrari F1RC', bestLap: '01:23.456', totalTime: '07:42.123', points: 25 },
-  { pos: 2, racer: 'Sardor M.', vehicle: 'Red Bull RC', bestLap: '01:24.001', totalTime: '07:45.678', points: 18 },
-  { pos: 3, racer: 'Aziz K.', vehicle: 'Mercedes RC', bestLap: '01:24.890', totalTime: '07:48.234', points: 15 },
-  { pos: 4, racer: 'Bobur H.', vehicle: 'McLaren RC', bestLap: '01:25.123', totalTime: '07:51.567', points: 12 },
-];
-
-interface Session {
-  id: string;
-  title: string;
-  event: string;
-  operator: string;
-  status: string;
-  participants: number;
-  startedAt: string | null;
-  duration: string | null;
-  laps: number;
+function messageOf(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = error.message;
+    if (typeof message === 'string') return message;
+  }
+  return 'Operatsiya bajarilmadi';
 }
 
-export default function RaceSessionsPage() {
-  const [selected, setSelected] = useState<Session | null>(null);
+function OperatorSessionControls() {
+  const [sessionId, setSessionId] = useState('');
+  const [notice, setNotice] = useState('');
+  const start = useStartRaceSession();
+  const finish = useFinishRaceSession();
+  const validId = /^\d+$/.test(sessionId) && Number(sessionId) > 0;
 
-  const activeSession = mockSessions.find(s => s.status === 'RUNNING');
+  const run = async (action: 'start' | 'finish') => {
+    if (!validId) return;
+    setNotice('');
+    try {
+      if (action === 'start') await start.mutateAsync(Number(sessionId));
+      else await finish.mutateAsync(Number(sessionId));
+      setNotice(action === 'start' ? 'Sessiya boshlandi.' : 'Sessiya yakunlandi.');
+    } catch (error: unknown) {
+      setNotice(messageOf(error));
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-5">
+      <header>
+        <h1 className="flex items-center gap-2 font-heading text-xl font-bold text-foreground">
+          <Flag className="h-5 w-5 text-primary" /> Operator sessiya boshqaruvi
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Swagger operator uchun sessiya ro‘yxatini bermaydi. Start/finish real sessiya ID orqali bajariladi.
+        </p>
+      </header>
+
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-xl">
+        <label htmlFor="operator-session-id" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Race session ID
+        </label>
+        <input
+          id="operator-session-id"
+          inputMode="numeric"
+          value={sessionId}
+          onChange={(event) => setSessionId(event.target.value.trim())}
+          placeholder="Masalan: 42"
+          className="mt-2 h-11 w-full rounded-xl border border-border bg-background px-4 font-mono text-foreground outline-none transition focus:border-primary"
+        />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={!validId || start.isPending || finish.isPending}
+            onClick={() => run('start')}
+            className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-500/15 font-heading text-sm font-bold text-green-400 transition hover:bg-green-500 hover:text-white disabled:opacity-40"
+          >
+            <Flag className="h-4 w-4" /> Start
+          </button>
+          <button
+            type="button"
+            disabled={!validId || start.isPending || finish.isPending}
+            onClick={() => run('finish')}
+            className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-red-500/15 font-heading text-sm font-bold text-red-400 transition hover:bg-red-500 hover:text-white disabled:opacity-40"
+          >
+            <CircleStop className="h-4 w-4" /> Finish
+          </button>
+        </div>
+        {notice && <p className="mt-4 rounded-xl border border-border bg-background/70 p-3 text-sm text-foreground">{notice}</p>}
+      </section>
+    </div>
+  );
+}
+
+function AdminRaceSessions() {
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState<'ALL' | RaceSessionStatus>('ALL');
+  const [showCreate, setShowCreate] = useState(false);
+  const [eventId, setEventId] = useState('');
+  const [name, setName] = useState('');
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [formError, setFormError] = useState('');
+
+  const sessions = useRaceSessions({
+    page,
+    limit: 10,
+    search: search || undefined,
+    status: status === 'ALL' ? undefined : status,
+    sortBy: 'scheduledAt',
+    sortOrder: 'desc',
+  });
+  const create = useCreateRaceSession();
+  const updateStatus = useUpdateRaceSessionStatus();
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!/^\d+$/.test(eventId) || Number(eventId) < 1) {
+      setFormError('To‘g‘ri event ID kiriting.');
+      return;
+    }
+    setFormError('');
+    try {
+      await create.mutateAsync({
+        eventId: Number(eventId),
+        name: name.trim() || undefined,
+        scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
+      });
+      setEventId('');
+      setName('');
+      setScheduledAt('');
+      setShowCreate(false);
+    } catch (error: unknown) {
+      setFormError(messageOf(error));
+    }
+  };
+
+  const setSessionStatus = async (id: number, nextStatus: RaceSessionStatus) => {
+    try {
+      await updateStatus.mutateAsync({ id, status: nextStatus });
+    } catch (error: unknown) {
+      setFormError(messageOf(error));
+    }
+  };
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-white tracking-wide flex items-center gap-2">
-            <Flag className="w-6 h-6 text-primary" />
-            Poyga Sessiyalar
+          <h1 className="flex items-center gap-2 font-heading text-xl font-bold text-foreground">
+            <Flag className="h-5 w-5 text-primary" /> Race Sessions
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{mockSessions.length} ta sessiya</p>
+          <p className="mt-1 text-sm text-muted-foreground">Real sessiyalar va lifecycle boshqaruvi</p>
         </div>
-        <button className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-heading font-semibold transition-all">
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Yangi Sessiya</span>
+        <button
+          type="button"
+          onClick={() => setShowCreate((value) => !value)}
+          className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 font-heading text-sm font-bold text-white transition hover:bg-primary/90"
+        >
+          <Plus className="h-4 w-4" /> Yangi sessiya
         </button>
-      </div>
+      </header>
 
-      {/* Active session banner */}
-      {activeSession && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-            <div>
-              <p className="text-sm font-heading font-semibold text-green-400">AKTIV SESSIYA</p>
-              <p className="text-xs text-muted-foreground">{activeSession.title} · {activeSession.participants} qatnashchi</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-green-400">
-            <Timer className="w-4 h-4" />
-            <span className="font-mono text-sm font-bold">{activeSession.duration}</span>
-          </div>
+      {showCreate && (
+        <form onSubmit={submit} className="grid gap-3 rounded-2xl border border-primary/20 bg-card p-4 shadow-xl md:grid-cols-4">
+          <input
+            inputMode="numeric"
+            value={eventId}
+            onChange={(event) => setEventId(event.target.value)}
+            placeholder="Event ID *"
+            className="h-11 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
+          />
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Sessiya nomi"
+            className="h-11 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
+          />
+          <input
+            type="datetime-local"
+            value={scheduledAt}
+            onChange={(event) => setScheduledAt(event.target.value)}
+            className="h-11 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
+          />
+          <button disabled={create.isPending} className="h-11 rounded-xl bg-primary font-heading text-sm font-bold text-white disabled:opacity-50">
+            {create.isPending ? 'Saqlanmoqda…' : 'Yaratish'}
+          </button>
+          {formError && <p className="text-sm text-red-400 md:col-span-4">{formError}</p>}
+        </form>
+      )}
+
+      <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 sm:flex-row">
+        <label className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+            placeholder="Sessiya qidirish…"
+            className="h-11 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-sm text-foreground outline-none focus:border-primary"
+          />
+        </label>
+        <select
+          value={status}
+          onChange={(event) => { setStatus(event.target.value as 'ALL' | RaceSessionStatus); setPage(1); }}
+          className="h-11 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
+        >
+          {statuses.map((value) => <option key={value} value={value}>{value === 'ALL' ? 'Barcha statuslar' : value}</option>)}
+        </select>
+      </section>
+
+      {sessions.isLoading ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }, (_, index) => <Skeleton key={index} className="h-48 rounded-2xl" />)}
+        </div>
+      ) : sessions.isError ? (
+        <ErrorState description={messageOf(sessions.error)} onRetry={() => sessions.refetch()} retrying={sessions.isFetching} />
+      ) : !sessions.data?.data.length ? (
+        <EmptyState icon={TimerReset} title="Sessiya topilmadi" description="Filterlarni o‘zgartiring yoki yangi sessiya yarating." />
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {sessions.data.data.map((session) => (
+            <article key={session.id} className="group rounded-2xl border border-border bg-card p-4 transition hover:border-primary/30 hover:shadow-xl">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-mono text-[11px] text-primary">SESSION #{session.id}</p>
+                  <h2 className="mt-1 font-heading font-bold text-foreground">{session.name || `Event #${session.eventId}`}</h2>
+                </div>
+                <StatusBadge status={session.status} />
+              </div>
+              <div className="mt-4 space-y-2 text-xs text-muted-foreground">
+                <p className="flex items-center gap-2"><Flag className="h-3.5 w-3.5" /> Event #{session.eventId}</p>
+                <p className="flex items-center gap-2"><CalendarClock className="h-3.5 w-3.5" /> {session.scheduledAt ? new Date(session.scheduledAt).toLocaleString('uz-UZ') : 'Vaqt belgilanmagan'}</p>
+              </div>
+              <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
+                <select
+                  aria-label={`Session ${session.id} statusi`}
+                  value={session.status}
+                  disabled={updateStatus.isPending}
+                  onChange={(event) => setSessionStatus(session.id, event.target.value as RaceSessionStatus)}
+                  className="h-10 rounded-xl border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
+                >
+                  {statuses.filter((value): value is RaceSessionStatus => value !== 'ALL').map((value) => <option key={value}>{value}</option>)}
+                </select>
+                <Link to={`/admin/race-sessions/${session.id}`} className="flex h-10 items-center rounded-xl border border-primary/25 px-3 text-xs font-bold text-primary transition hover:bg-primary hover:text-white">
+                  Batafsil
+                </Link>
+              </div>
+            </article>
+          ))}
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Sessions list */}
-        <div className="xl:col-span-1 space-y-3">
-          {mockSessions.map(session => (
-            <div
-              key={session.id}
-              onClick={() => setSelected(session)}
-              className={`bg-card border rounded-xl p-4 cursor-pointer transition-all hover:border-primary/30 ${selected?.id === session.id ? 'border-primary/50 bg-primary/5' : 'border-border'}`}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <span className="text-xs font-display font-bold text-primary">{session.id}</span>
-                <StatusBadge status={session.status} />
-              </div>
-              <h3 className="text-sm font-heading font-semibold text-white mb-2 leading-snug">{session.title}</h3>
-              <div className="space-y-1.5 text-xs text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <User className="w-3 h-3" />
-                  <span>{session.operator}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Flag className="w-3 h-3" />
-                  <span>{session.participants} qatnashchi · {session.laps} lap</span>
-                </div>
-                {session.startedAt && (
-                  <div className="flex items-center gap-2">
-                    <Timer className="w-3 h-3" />
-                    <span>{session.startedAt} · {session.duration}</span>
-                  </div>
-                )}
-              </div>
-              {session.status === 'WAITING' && (
-                <button className="w-full mt-3 flex items-center justify-center gap-2 bg-primary/10 border border-primary/30 hover:bg-primary hover:text-white text-primary rounded-lg py-2 text-xs font-heading font-semibold transition-all">
-                  <Play className="w-3 h-3" />
-                  Boshlash
-                </button>
-              )}
-              {session.status === 'RUNNING' && (
-                <button className="w-full mt-3 flex items-center justify-center gap-2 bg-red-500/10 border border-red-500/30 hover:bg-red-500 hover:text-white text-red-400 rounded-lg py-2 text-xs font-heading font-semibold transition-all">
-                  <Square className="w-3 h-3" />
-                  Tugatish
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Results panel */}
-        <div className="xl:col-span-2">
-          {selected ? (
-            <div className="bg-card border border-border rounded-xl overflow-hidden">
-              <div className="p-5 border-b border-border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-heading font-bold text-white">{selected.title}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">{selected.event}</p>
-                  </div>
-                  <StatusBadge status={selected.status} />
-                </div>
-              </div>
-              {selected.status === 'FINISHED' ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/30">
-                        <th className="text-left px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase">O'rin</th>
-                        <th className="text-left px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase">Racer</th>
-                        <th className="text-left px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase hidden md:table-cell">Mashina</th>
-                        <th className="text-right px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase">Best Lap</th>
-                        <th className="text-right px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase hidden lg:table-cell">Jami</th>
-                        <th className="text-right px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase">Ball</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mockResults.map((r, i) => (
-                        <tr key={r.pos} className={`border-b border-border/50 ${i === mockResults.length - 1 ? 'border-0' : ''}`}>
-                          <td className="px-5 py-3.5">
-                            <span className={`w-7 h-7 rounded flex items-center justify-center text-xs font-display font-bold
-                              ${r.pos === 1 ? 'bg-yellow-500/20 text-yellow-400' : r.pos === 2 ? 'bg-gray-400/20 text-gray-300' : r.pos === 3 ? 'bg-orange-500/20 text-orange-400' : 'bg-muted text-muted-foreground'}
-                            `}>{r.pos}</span>
-                          </td>
-                          <td className="px-5 py-3.5"><span className="text-sm text-white font-heading">{r.racer}</span></td>
-                          <td className="px-5 py-3.5 hidden md:table-cell"><span className="text-xs text-muted-foreground">{r.vehicle}</span></td>
-                          <td className="px-5 py-3.5 text-right"><span className="text-xs font-mono text-green-400">{r.bestLap}</span></td>
-                          <td className="px-5 py-3.5 text-right hidden lg:table-cell"><span className="text-xs font-mono text-muted-foreground">{r.totalTime}</span></td>
-                          <td className="px-5 py-3.5 text-right"><span className="text-sm font-display font-bold text-primary">+{r.points}</span></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                  <Flag className="w-12 h-12 mb-3 opacity-30" />
-                  <p className="font-heading text-sm">Natijalar mavjud emas</p>
-                  <p className="text-xs mt-1">Sessiya tugagandan keyin natijalar ko'rsatiladi</p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="bg-card border border-border rounded-xl flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <Flag className="w-12 h-12 mb-3 opacity-20" />
-              <p className="font-heading text-sm">Sessiyani tanlang</p>
-              <p className="text-xs mt-1">Natijalarni ko'rish uchun sessiyaga bosing</p>
-            </div>
-          )}
-        </div>
-      </div>
+      {sessions.data && sessions.data.meta.totalPages > 1 && (
+        <nav className="flex items-center justify-between rounded-xl border border-border bg-card p-3 text-sm">
+          <button disabled={!sessions.data.meta.hasPrevPage} onClick={() => setPage((value) => value - 1)} className="flex min-h-10 items-center gap-1 px-3 disabled:opacity-30"><ChevronLeft className="h-4 w-4" /> Oldingi</button>
+          <span className="text-muted-foreground">{page} / {sessions.data.meta.totalPages}</span>
+          <button disabled={!sessions.data.meta.hasNextPage} onClick={() => setPage((value) => value + 1)} className="flex min-h-10 items-center gap-1 px-3 disabled:opacity-30">Keyingi <ChevronRight className="h-4 w-4" /></button>
+        </nav>
+      )}
     </div>
   );
+}
+
+export default function RaceSessionsPage() {
+  const { user } = useAuth();
+  return user?.role === 'operator' ? <OperatorSessionControls /> : <AdminRaceSessions />;
 }

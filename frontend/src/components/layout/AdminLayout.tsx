@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Calendar, BookOpen,
   Flag, Trophy, Users2, CreditCard, Activity,
   Settings, LogOut, Menu, X, ChevronRight,
-  Shield, Zap, Radio, Car, Tag
+  Shield, Zap, Radio, Car, Tag, Wrench, Gift, Bell, MapPinned, Medal
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import MobileBottomNav from './MobileBottomNav';
@@ -13,12 +13,14 @@ import LanguageSwitcher from '@/components/ui/LanguageSwitcher';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/AuthContext';
 import PremiumIconBox from '@/components/ui/PremiumIconBox';
+import { useHealth } from '@/hooks/api/useHealth';
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const { t } = useI18n();
   const { user } = useAuth();
+  const health = useHealth();
 
   const navItems = [
     { path: '/admin',              icon: LayoutDashboard, label: t.dashboard,    exact: true },
@@ -30,10 +32,15 @@ export default function AdminLayout() {
     { path: '/admin/teams',        icon: Users2,          label: t.teams },
     { path: '/admin/seasons',      icon: Zap,             label: t.seasons },
     { path: '/admin/vehicles',     icon: Car,             label: t.vehicles },
+    { path: '/admin/maintenance',  icon: Wrench,          label: 'Texnik xizmat' },
+    { path: '/admin/arenas',       icon: MapPinned,       label: 'Arenalar' },
     { path: '/admin/categories',   icon: Tag,             label: t.categories },
+    { path: '/admin/achievements', icon: Medal,           label: 'Achievementlar' },
     { path: '/admin/streams',      icon: Radio,           label: t.streams },
     { path: '/admin/payments',     icon: CreditCard,      label: t.payments },
     { path: '/admin/audit-logs',   icon: Activity,        label: t.auditLogs },
+    { path: '/admin/referrals',    icon: Gift,            label: 'Referrallar' },
+    { path: '/admin/notifications',icon: Bell,            label: 'Bildirishnomalar' },
   ];
 
   const mobileNavItems = [
@@ -77,7 +84,7 @@ export default function AdminLayout() {
             <div>
               <span className="font-display text-sm font-bold text-sidebar-foreground tracking-wider">F1RC.UZ</span>
               <p className="text-[10px] text-primary font-heading tracking-widest uppercase">
-                {user?.role === 'superadmin' ? 'Superadmin' : 'Admin'}
+                {user?.role?.toLowerCase() === 'superadmin' ? 'Superadmin' : 'Admin'}
               </p>
             </div>
           </div>
@@ -158,9 +165,9 @@ export default function AdminLayout() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="hidden lg:flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-            <span className="font-mono">{t.systemOnline}</span>
+          <div className="hidden lg:flex items-center gap-2 text-xs text-muted-foreground" title={health.data ? `Database: ${health.data.database} · Uptime: ${Math.round(health.data.uptime)}s` : undefined}>
+            <div className={`w-1.5 h-1.5 rounded-full ${health.data?.status === 'ok' ? 'bg-green-500 animate-pulse' : health.isError ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
+            <span className="font-mono">{health.data?.status === 'ok' ? t.systemOnline : health.isError ? 'Backend offline' : 'Backend tekshirilmoqda'}</span>
           </div>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
@@ -168,7 +175,7 @@ export default function AdminLayout() {
             <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-border">
               <div className="text-right">
                 <p className="text-xs font-heading font-semibold text-foreground tracking-wide uppercase">
-                  {user?.role === 'superadmin' ? 'SUPERADMIN' : 'ADMIN'}
+                  {user?.role?.toLowerCase() === 'superadmin' ? 'SUPERADMIN' : 'ADMIN'}
                 </p>
                 <p className="text-[10px] text-muted-foreground">{user?.email || 'admin@f1rc.uz'}</p>
               </div>

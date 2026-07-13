@@ -69,7 +69,7 @@ export const InputOTP = React.forwardRef<HTMLDivElement, InputOTPProps>(
 );
 InputOTP.displayName = 'InputOTP';
 
-export interface InputOTPGroupProps extends React.HTMLAttributes<HTMLDivElement> {}
+export type InputOTPGroupProps = React.HTMLAttributes<HTMLDivElement>;
 
 export const InputOTPGroup = React.forwardRef<HTMLDivElement, InputOTPGroupProps>(
   ({ className, ...props }, ref) => {

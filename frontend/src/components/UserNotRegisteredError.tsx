@@ -1,11 +1,8 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { ShieldAlert, Mail, RefreshCw } from 'lucide-react';
 
 const UserNotRegisteredError: React.FC = () => {
-  const navigate = useNavigate();
-
   const handleLogout = () => {
     base44.auth.logout('/login');
   };

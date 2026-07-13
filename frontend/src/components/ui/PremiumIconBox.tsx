@@ -1,9 +1,9 @@
-import React from 'react';
-import { LucideIcon } from 'lucide-react';
+import type { ComponentType } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface PremiumIconBoxProps {
-  icon: LucideIcon | React.ComponentType<any>;
+  icon: LucideIcon | ComponentType<{ className?: string }>;
   color?: 'red' | 'blue' | 'green' | 'yellow' | 'purple' | 'orange' | 'zinc';
   size?: 'sm' | 'md' | 'lg';
   className?: string;

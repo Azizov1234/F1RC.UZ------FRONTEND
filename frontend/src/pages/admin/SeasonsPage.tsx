@@ -1,158 +1,283 @@
-import { useState } from 'react';
-import { Zap, Plus, Trophy, Users, Calendar, ChevronRight, Radio } from 'lucide-react';
+import { type FormEvent, useState } from 'react';
+import { CalendarDays, Eye, Pencil, Plus, Power, Search, Zap } from 'lucide-react';
 import StatusBadge from '@/components/admin/StatusBadge';
+import TablePagination from '@/components/admin/TablePagination';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Modal } from '@/components/ui/Modal';
+import { CardSkeleton } from '@/components/ui/Skeleton';
+import { toast } from '@/components/ui/use-toast';
+import {
+  useAdminSeason,
+  useAdminSeasons,
+  useCreateSeason,
+  useToggleSeason,
+  useUpdateSeason,
+} from '@/hooks/api/useSeasons';
+import type { CreateSeasonDto } from '@/api/seasons.api';
+import type { Season } from '@/types';
 
-const mockSeasons = [
-  { id: 1, title: 'F1RC Season 2025 — Spring', type: '6 OY', startDate: '2025-01-01', endDate: '2025-06-30', status: 'ACTIVE', participants: 124, prizePool: 500000, currency: 'USD', stages: 3 },
-  { id: 2, title: 'F1RC Season 2024 — Annual', type: '1 YIL', startDate: '2024-01-01', endDate: '2024-12-31', status: 'FINISHED', participants: 280, prizePool: 500000, currency: 'USD', stages: 6 },
-];
+const inputClass =
+  'w-full rounded-xl border border-border bg-background/70 px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/10';
 
-const mockStandings = [
-  { rank: 1, name: 'Jahongir T.', points: 2840, change: '+2', prizes: '$150,000' },
-  { rank: 2, name: 'Sardor M.', points: 2650, change: '=', prizes: '$100,000' },
-  { rank: 3, name: 'Aziz K.', points: 2410, change: '-1', prizes: '$75,000' },
-  { rank: 4, name: 'Bobur H.', points: 2180, change: '+3', prizes: '$50,000' },
-  { rank: 5, name: 'Ulugbek N.', points: 1960, change: '-2', prizes: '$30,000' },
-];
+function errorText(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = error.message;
+    if (typeof message === 'string') return message;
+  }
+  return 'Amalni bajarib bo\'lmadi';
+}
+
+function displayDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('uz-UZ', { dateStyle: 'medium' }).format(date);
+}
+
+function dateInput(value?: string): string {
+  return value ? value.slice(0, 10) : '';
+}
+
+function seasonProgress(season: Season): number {
+  const start = new Date(season.startDate).getTime();
+  const end = new Date(season.endDate).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+  return Math.max(0, Math.min(100, ((Date.now() - start) / (end - start)) * 100));
+}
+
+function SeasonFormModal({ season, onClose }: { season?: Season; onClose: () => void }) {
+  const createSeason = useCreateSeason();
+  const updateSeason = useUpdateSeason();
+  const pending = createSeason.isPending || updateSeason.isPending;
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const payload: CreateSeasonDto = {
+      name: String(form.get('name') ?? '').trim(),
+      slug: String(form.get('slug') ?? '').trim() || undefined,
+      description: String(form.get('description') ?? '').trim() || undefined,
+      startDate: String(form.get('startDate')),
+      endDate: String(form.get('endDate')),
+      isActive: form.get('isActive') === 'on',
+    };
+
+    try {
+      if (season) {
+        await updateSeason.mutateAsync({ id: season.id, data: payload });
+        toast({ title: 'Season yangilandi' });
+      } else {
+        await createSeason.mutateAsync(payload);
+        toast({ title: 'Season yaratildi' });
+      }
+      onClose();
+    } catch (error: unknown) {
+      toast({
+        title: season ? 'Season yangilanmadi' : 'Season yaratilmadi',
+        description: errorText(error),
+        variant: 'destructive',
+      });
+    }
+  }
+
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={season ? 'Seasonni tahrirlash' : 'Yangi season'}
+      description="Backend season ma'lumotlarini kiriting."
+      size="lg"
+    >
+      <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
+        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground sm:col-span-2">
+          Nomi
+          <input name="name" defaultValue={season?.name} required className={`${inputClass} mt-2`} />
+        </label>
+        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground sm:col-span-2">
+          Slug
+          <input name="slug" defaultValue={season?.slug ?? ''} className={`${inputClass} mt-2`} />
+        </label>
+        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          Boshlanish sanasi
+          <input name="startDate" type="date" defaultValue={dateInput(season?.startDate)} required className={`${inputClass} mt-2`} />
+        </label>
+        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          Tugash sanasi
+          <input name="endDate" type="date" defaultValue={dateInput(season?.endDate)} required className={`${inputClass} mt-2`} />
+        </label>
+        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground sm:col-span-2">
+          Tavsif
+          <textarea name="description" defaultValue={season?.description ?? ''} rows={4} className={`${inputClass} mt-2 resize-none`} />
+        </label>
+        <label className="flex items-center gap-3 text-sm font-semibold text-foreground sm:col-span-2">
+          <input name="isActive" type="checkbox" defaultChecked={season?.isActive ?? true} className="h-4 w-4 accent-primary" />
+          Aktiv season
+        </label>
+        <div className="flex justify-end gap-2 pt-2 sm:col-span-2">
+          <button type="button" onClick={onClose} className="min-h-11 rounded-xl border border-border px-4 text-sm text-muted-foreground hover:text-foreground">Bekor</button>
+          <button type="submit" disabled={pending} className="min-h-11 rounded-xl bg-primary px-5 text-sm font-bold text-white disabled:opacity-50">
+            {pending ? 'Saqlanmoqda…' : 'Saqlash'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function SeasonDetail({
+  id,
+  onEdit,
+}: {
+  id: number | string;
+  onEdit: (season: Season) => void;
+}) {
+  const query = useAdminSeason(id);
+  const toggle = useToggleSeason();
+  const season = query.data;
+
+  async function toggleActive() {
+    if (!season) return;
+    try {
+      await toggle.mutateAsync({ id: season.id, isActive: !season.isActive });
+      toast({ title: season.isActive ? 'Season o\'chirildi' : 'Season faollashtirildi' });
+    } catch (error: unknown) {
+      toast({ title: 'Status yangilanmadi', description: errorText(error), variant: 'destructive' });
+    }
+  }
+
+  if (query.isLoading) {
+    return <div className="rounded-2xl border border-border bg-card/70 p-5"><CardSkeleton /></div>;
+  }
+  if (query.isError || !season) {
+    return <div className="rounded-2xl border border-border bg-card/70"><ErrorState onRetry={() => query.refetch()} /></div>;
+  }
+
+  const progress = seasonProgress(season);
+  return (
+    <section className="overflow-hidden rounded-2xl border border-border bg-card/70 shadow-xl">
+      <div className="border-b border-border p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Season #{season.id}</p>
+            <h2 className="mt-1 text-xl font-bold text-foreground font-heading">{season.name}</h2>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{season.description || 'Tavsif kiritilmagan.'}</p>
+          </div>
+          <StatusBadge status={season.isActive ? 'ACTIVE' : 'INACTIVE'} />
+        </div>
+      </div>
+      <div className="space-y-5 p-5">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-border bg-background/40 p-4">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Boshlanishi</p>
+            <p className="mt-1 font-semibold text-foreground">{displayDate(season.startDate)}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-background/40 p-4">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Tugashi</p>
+            <p className="mt-1 font-semibold text-foreground">{displayDate(season.endDate)}</p>
+          </div>
+        </div>
+        <div>
+          <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+            <span>Season vaqt oralig'i</span><span>{Math.round(progress)}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button onClick={() => onEdit(season)} className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-white"><Pencil className="h-4 w-4" /> Tahrirlash</button>
+          <button onClick={toggleActive} disabled={toggle.isPending} className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-border text-sm font-bold text-muted-foreground hover:border-primary/40 hover:text-primary disabled:opacity-50"><Power className="h-4 w-4" /> {season.isActive ? "O'chirish" : 'Faollashtirish'}</button>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function SeasonsPage() {
-  const [selected, setSelected] = useState(mockSeasons[0]);
-  const [tab, setTab] = useState('standings');
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [selectedId, setSelectedId] = useState<number | string>();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<Season>();
+  const toggle = useToggleSeason();
+  const query = useAdminSeasons({
+    page,
+    limit: 12,
+    search: search || undefined,
+    isActive: activeFilter === 'all' ? undefined : activeFilter === 'active',
+    sortBy: 'startDate',
+    sortOrder: 'desc',
+  });
+  const seasons = query.data?.data ?? [];
+  const meta = query.data?.meta;
+
+  async function toggleFromList(season: Season) {
+    try {
+      await toggle.mutateAsync({ id: season.id, isActive: !season.isActive });
+      toast({ title: season.isActive ? 'Season o\'chirildi' : 'Season faollashtirildi' });
+    } catch (error: unknown) {
+      toast({ title: 'Status yangilanmadi', description: errorText(error), variant: 'destructive' });
+    }
+  }
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-white tracking-wide flex items-center gap-2">
-            <Zap className="w-6 h-6 text-primary" />
-            Seasons
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">$500,000 prize pool boshqaruvi</p>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground font-heading"><Zap className="h-6 w-6 text-primary" /> Seasons</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{meta?.total ?? 0} ta real season</p>
         </div>
-        <button className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-heading font-semibold transition-all">
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Yangi Season</span>
-        </button>
+        <button onClick={() => setCreateOpen(true)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-white hover:bg-primary/90"><Plus className="h-4 w-4" /> Yangi season</button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Season list */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card/60 p-3 sm:flex-row">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Season qidirish…" className={`${inputClass} pl-9`} />
+        </div>
+        <select value={activeFilter} onChange={(event) => { setActiveFilter(event.target.value as 'all' | 'active' | 'inactive'); setPage(1); }} className={`${inputClass} sm:w-52`}>
+          <option value="all">Barchasi</option>
+          <option value="active">Aktiv</option>
+          <option value="inactive">Aktiv emas</option>
+        </select>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]">
         <div className="space-y-3">
-          {mockSeasons.map(season => (
-            <div
-              key={season.id}
-              onClick={() => setSelected(season)}
-              className={`bg-card border rounded-xl p-4 cursor-pointer transition-all hover:border-primary/30 ${selected?.id === season.id ? 'border-primary/50 bg-primary/5' : 'border-border'}`}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <span className="text-[10px] font-display font-bold text-primary tracking-widest">{season.type}</span>
-                <StatusBadge status={season.status} />
-              </div>
-              <h3 className="text-sm font-heading font-semibold text-white leading-snug mb-3">{season.title}</h3>
-              <div className="space-y-1.5 text-xs text-muted-foreground">
-                <div className="flex items-center gap-2"><Calendar className="w-3 h-3" /><span>{season.startDate} → {season.endDate}</span></div>
-                <div className="flex items-center gap-2"><Users className="w-3 h-3" /><span>{season.participants} qatnashchi</span></div>
-              </div>
-              {/* Prize pool */}
-              <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
-                <span className="text-[10px] text-muted-foreground font-heading uppercase tracking-widest">Prize Pool</span>
-                <span className="text-lg font-display font-bold text-yellow-400">${season.prizePool.toLocaleString()}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Detail panel */}
-        <div className="xl:col-span-2">
-          {selected && (
-            <div className="bg-card border border-border rounded-xl overflow-hidden">
-              {/* Header */}
-              <div className="p-5 border-b border-border">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-heading font-bold text-white">{selected.title}</h3>
-                    <div className="flex items-center gap-3 mt-2">
-                      {[
-                        { label: 'Qatnashchi', value: selected.participants },
-                        { label: 'Bosqich', value: selected.stages },
-                        { label: 'Prize', value: `$${(selected.prizePool / 1000).toFixed(0)}K` },
-                      ].map(s => (
-                        <div key={s.label} className="text-center">
-                          <p className="text-base font-display font-bold text-primary">{s.value}</p>
-                          <p className="text-[10px] text-muted-foreground font-heading">{s.label}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <StatusBadge status={selected.status} />
-                </div>
-              </div>
-
-              {/* Tabs */}
-              <div className="flex border-b border-border px-5">
-                {['standings', 'prizes'].map(t => (
-                  <button key={t} onClick={() => setTab(t)} className={`px-4 py-3 text-xs font-heading font-semibold tracking-wide border-b-2 transition-all -mb-px ${tab === t ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-white'}`}>
-                    {t === 'standings' ? 'Reyting' : 'Sovrinlar'}
+          {query.isError ? (
+            <div className="rounded-2xl border border-border bg-card/70"><ErrorState onRetry={() => query.refetch()} retrying={query.isFetching} /></div>
+          ) : !query.isLoading && seasons.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-card/70"><EmptyState icon={CalendarDays} isFiltered={Boolean(search || activeFilter !== 'all')} action={<button onClick={() => setCreateOpen(true)} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white">Season yaratish</button>} /></div>
+          ) : query.isLoading ? (
+            Array.from({ length: 4 }).map((_, index) => <CardSkeleton key={index} />)
+          ) : (
+            seasons.map((season) => (
+              <article key={season.id} className={`rounded-2xl border bg-card/70 p-4 transition ${selectedId === season.id ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/30'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <button type="button" onClick={() => setSelectedId(season.id)} className="min-w-0 flex-1 text-left">
+                    <div className="flex items-center gap-2"><StatusBadge status={season.isActive ? 'ACTIVE' : 'INACTIVE'} /><span className="text-[10px] text-muted-foreground">#{season.id}</span></div>
+                    <h2 className="mt-2 truncate text-sm font-bold text-foreground font-heading">{season.name}</h2>
+                    <p className="mt-2 text-xs text-muted-foreground">{displayDate(season.startDate)} → {displayDate(season.endDate)}</p>
                   </button>
-                ))}
-              </div>
-
-              {tab === 'standings' && (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/30">
-                        <th className="text-left px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase">#</th>
-                        <th className="text-left px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase">Racer</th>
-                        <th className="text-right px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase">Ball</th>
-                        <th className="text-right px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase hidden md:table-cell">O'zgarish</th>
-                        <th className="text-right px-5 py-3 text-[11px] font-heading text-muted-foreground tracking-widest uppercase hidden lg:table-cell">Taxminiy sovrin</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mockStandings.map((r, i) => (
-                        <tr key={r.rank} className={`border-b border-border/50 ${i === mockStandings.length - 1 ? 'border-0' : ''}`}>
-                          <td className="px-5 py-3.5">
-                            <span className={`w-6 h-6 rounded flex items-center justify-center text-xs font-display font-bold
-                              ${r.rank === 1 ? 'bg-yellow-500/20 text-yellow-400' : r.rank === 2 ? 'bg-gray-400/20 text-gray-300' : r.rank === 3 ? 'bg-orange-500/20 text-orange-400' : 'bg-muted text-muted-foreground'}
-                            `}>{r.rank}</span>
-                          </td>
-                          <td className="px-5 py-3.5"><span className="text-sm text-white font-heading">{r.name}</span></td>
-                          <td className="px-5 py-3.5 text-right"><span className="text-sm font-display font-bold text-primary">{r.points.toLocaleString()}</span></td>
-                          <td className="px-5 py-3.5 text-right hidden md:table-cell">
-                            <span className={`text-xs font-mono ${r.change.startsWith('+') ? 'text-green-400' : r.change === '=' ? 'text-muted-foreground' : 'text-red-400'}`}>{r.change}</span>
-                          </td>
-                          <td className="px-5 py-3.5 text-right hidden lg:table-cell"><span className="text-sm font-display font-bold text-yellow-400">{r.prizes}</span></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <button type="button" onClick={() => toggleFromList(season)} disabled={toggle.isPending} aria-label={season.isActive ? "Seasonni o'chirish" : 'Seasonni faollashtirish'} className="flex h-10 w-10 items-center justify-center rounded-xl border border-border text-muted-foreground hover:border-primary/40 hover:text-primary disabled:opacity-50"><Power className="h-4 w-4" /></button>
                 </div>
-              )}
-
-              {tab === 'prizes' && (
-                <div className="p-5 space-y-3">
-                  {[
-                    { pos: '1-o\'rin', amount: '$150,000', percent: '30%', color: 'border-yellow-500/30 bg-yellow-500/5 text-yellow-400' },
-                    { pos: '2-o\'rin', amount: '$100,000', percent: '20%', color: 'border-gray-400/30 bg-gray-400/5 text-gray-300' },
-                    { pos: '3-o\'rin', amount: '$75,000', percent: '15%', color: 'border-orange-500/30 bg-orange-500/5 text-orange-400' },
-                    { pos: '4–5 o\'rin', amount: '$50,000', percent: '10%', color: 'border-border bg-muted text-muted-foreground' },
-                    { pos: '6–10 o\'rin', amount: '$25,000', percent: '5%', color: 'border-border bg-muted text-muted-foreground' },
-                  ].map(p => (
-                    <div key={p.pos} className={`border rounded-xl p-4 flex items-center justify-between ${p.color}`}>
-                      <span className="font-heading font-semibold text-sm">{p.pos}</span>
-                      <div className="text-right">
-                        <p className="font-display font-bold text-lg">{p.amount}</p>
-                        <p className="text-[10px] text-muted-foreground">{p.percent} prize pool</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                <button type="button" onClick={() => setSelectedId(season.id)} className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-border text-xs font-bold text-muted-foreground hover:text-primary"><Eye className="h-4 w-4" /> Detail</button>
+              </article>
+            ))
           )}
+          {meta && <TablePagination total={meta.total} page={meta.page} limit={meta.limit} totalPages={meta.totalPages} onPageChange={setPage} isLoading={query.isFetching} showingCount={seasons.length} />}
         </div>
+        {selectedId !== undefined ? (
+          <SeasonDetail id={selectedId} onEdit={setEditing} />
+        ) : (
+          <div className="rounded-2xl border border-border bg-card/70"><EmptyState icon={Eye} title="Seasonni tanlang" description="To'liq backend ma'lumotini ko'rish uchun chapdagi seasonlardan birini oching." /></div>
+        )}
       </div>
+
+      {createOpen && <SeasonFormModal onClose={() => setCreateOpen(false)} />}
+      {editing && <SeasonFormModal key={editing.id} season={editing} onClose={() => setEditing(undefined)} />}
     </div>
   );
 }

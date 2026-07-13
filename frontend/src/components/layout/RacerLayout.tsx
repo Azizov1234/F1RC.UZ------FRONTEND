@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Home, Calendar, Trophy, Swords, User, Flag, Menu, X, Shield, LogOut, Bell } from 'lucide-react';
+import { Home, Calendar, Trophy, Swords, User, Flag, Menu, X, LogOut, Bell, Compass, CreditCard } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import MobileBottomNav from './MobileBottomNav';
 import { useAuth } from '@/lib/AuthContext';
@@ -17,10 +17,13 @@ export default function RacerLayout() {
 
   const navItems = [
     { path: '/racer',            icon: Home,     label: t.dashboard,  exact: true },
+    { path: '/racer/explore',    icon: Compass,  label: 'Explore' },
     { path: '/racer/events',     icon: Calendar, label: t.events },
     { path: '/racer/leaderboard',icon: Trophy,   label: t.leaderboard },
     { path: '/racer/challenges', icon: Swords,   label: t.challenges },
     { path: '/racer/profile',    icon: User,     label: t.profile },
+    { path: '/racer/payments',   icon: CreditCard, label: 'To‘lovlar' },
+    { path: '/racer/notifications', icon: Bell, label: 'Bildirishnomalar' },
   ];
 
   const isActive = (path: string, exact?: boolean) => exact ? location.pathname === path : location.pathname.startsWith(path);
@@ -94,9 +97,9 @@ export default function RacerLayout() {
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
             <ThemeToggle />
-            <button className="w-10 h-10 rounded-xl bg-card/60 border border-border/80 backdrop-blur-md flex items-center justify-center text-muted-foreground hover:text-white hover:border-primary/50 shadow-md transition-all duration-300 active:scale-90">
+            <Link to="/racer/notifications" aria-label="Bildirishnomalar" className="w-10 h-10 rounded-xl bg-card/60 border border-border/80 backdrop-blur-md flex items-center justify-center text-muted-foreground hover:text-white hover:border-primary/50 shadow-md transition-all duration-300 active:scale-90">
               <Bell className="w-4 h-4" />
-            </button>
+            </Link>
             <div className="w-10 h-10 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center text-sm font-heading font-bold text-green-400">
               {user?.full_name?.[0] || 'R'}
             </div>

@@ -1,125 +1,121 @@
-import { useState } from 'react';
-import { QrCode, Search, CheckCircle, XCircle } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { CalendarClock, CheckCircle2, Hash, UserRound, Warehouse } from 'lucide-react';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { useCheckInBooking } from '@/hooks/api/useBookings';
 
-const mockBookings = [
-  { code: 'F1RC-A4K2', user: 'Jahongir T.', event: 'Formula RC Sprint', slot: '14:30', vehicle: 'Ferrari F1RC', status: 'CONFIRMED' },
-  { code: 'F1RC-B8X9', user: 'Sardor M.', event: 'GT Race Night', slot: '16:00', vehicle: 'GT Racer Pro', status: 'CHECKED_IN' },
-  { code: 'F1RC-C3Y1', user: 'Aziz K.', event: 'Formula RC Sprint', slot: '14:30', vehicle: 'Rally Monster', status: 'CONFIRMED' },
-];
-
-interface Booking {
-  code: string;
-  user: string;
-  event: string;
-  slot: string;
-  vehicle: string;
-  status: string;
+function formatDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('uz-UZ', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
 export default function OperatorCheckInPage() {
-  const [code, setCode] = useState('');
-  const [result, setResult] = useState<Booking | null>(null);
-  const [searched, setSearched] = useState(false);
+  const [input, setInput] = useState('');
+  const [bookingId, setBookingId] = useState<number>();
+  const checkIn = useCheckInBooking();
+  const booking = checkIn.data?.id === bookingId ? checkIn.data : undefined;
 
-  const handleSearch = () => {
-    const found = mockBookings.find(b => b.code.toLowerCase() === code.toLowerCase().trim());
-    setResult(found || null);
-    setSearched(true);
-  };
-
-  const handleCheckIn = () => {
-    setResult(prev => prev ? { ...prev, status: 'CHECKED_IN' } : null);
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalized = input.trim();
+    if (!/^[1-9]\d*$/.test(normalized)) {
+      setBookingId(undefined);
+      checkIn.reset();
+      return;
+    }
+    const id = Number(normalized);
+    setBookingId(id);
+    checkIn.reset();
+    checkIn.mutate(id);
   };
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-heading font-bold text-white flex items-center gap-2">
-          <QrCode className="w-5 h-5 text-blue-400" /> QR Check-In
+    <div className="mx-auto max-w-3xl space-y-5">
+      <header>
+        <h1 className="flex items-center gap-2 font-heading text-xl font-bold text-foreground">
+          <CheckCircle2 className="h-5 w-5 text-emerald-400" /> Booking ID check-in
         </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Booking kodi orqali racerni kiriting</p>
-      </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Backend operator uchun lookup endpoint bermaydi. Musbat booking ID bevosita real check-in endpointiga yuboriladi.
+        </p>
+      </header>
 
-      {/* QR input */}
-      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-        <div className="w-24 h-24 rounded-xl bg-blue-500/10 border-2 border-dashed border-blue-500/30 flex flex-col items-center justify-center mx-auto gap-2">
-          <QrCode className="w-10 h-10 text-blue-400" />
-          <span className="text-[10px] text-muted-foreground font-heading">QR SCAN</span>
-        </div>
-        <p className="text-center text-xs text-muted-foreground">Yoki qo'lda kodni kiriting:</p>
-        <div className="flex gap-2">
+      <form onSubmit={submit} className="rounded-xl border border-border bg-card p-5">
+        <label htmlFor="booking-id" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Booking ID
+        </label>
+        <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Hash className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
-              value={code}
-              onChange={e => setCode(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSearch()}
-              placeholder="F1RC-XXXX"
-              className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-blue-500 font-mono uppercase"
+              id="booking-id"
+              inputMode="numeric"
+              pattern="[1-9][0-9]*"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              placeholder="Masalan: 1042"
+              className="w-full rounded-lg border border-border bg-background py-3 pl-9 pr-4 font-mono text-sm text-foreground outline-none focus:border-emerald-500"
             />
           </div>
-          <button onClick={handleSearch} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-heading font-semibold transition-all">Qidirish</button>
+          <button
+            type="submit"
+            disabled={checkIn.isPending}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+          >
+            <CheckCircle2 className="h-4 w-4" /> {checkIn.isPending ? 'Check-in qilinmoqda…' : 'CHECK-IN QILISH'}
+          </button>
         </div>
-      </div>
+        {input.length > 0 && !/^[1-9]\d*$/.test(input.trim()) && (
+          <p className="mt-2 text-xs text-red-400">Musbat raqam kiriting; QR yoki matnli kod qidiruvi mavjud emas.</p>
+        )}
+      </form>
 
-      {/* Result */}
-      {searched && (
-        result ? (
-          <div className={`bg-card border rounded-xl p-5 ${result.status === 'CHECKED_IN' ? 'border-green-500/30' : 'border-blue-500/30'}`}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-display font-bold text-primary">{result.code}</span>
-              <StatusBadge status={result.status} />
-            </div>
-            <div className="space-y-2 mb-4">
-              {[
-                { label: 'Racer', value: result.user },
-                { label: 'Event', value: result.event },
-                { label: 'Slot', value: result.slot },
-                { label: 'Mashina', value: result.vehicle },
-              ].map(f => (
-                <div key={f.label} className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground font-heading">{f.label}</span>
-                  <span className="text-sm font-heading font-medium text-white">{f.value}</span>
-                </div>
-              ))}
-            </div>
-            {result.status === 'CONFIRMED' ? (
-              <button onClick={handleCheckIn} className="w-full flex items-center justify-center gap-2 bg-green-500/15 border border-green-500/30 hover:bg-green-500 hover:text-white text-green-400 rounded-xl py-3 text-sm font-heading font-bold transition-all">
-                <CheckCircle className="w-4 h-4" /> CHECK-IN QILISH
-              </button>
-            ) : result.status === 'CHECKED_IN' ? (
-              <div className="w-full flex items-center justify-center gap-2 bg-green-500/15 border border-green-500/30 text-green-400 rounded-xl py-3 text-sm font-heading font-bold">
-                <CheckCircle className="w-4 h-4" /> ALLAQACHON CHECK-IN QILINGAN ✓
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="bg-card border border-red-500/30 rounded-xl p-5 flex flex-col items-center gap-3 text-center">
-            <XCircle className="w-10 h-10 text-red-400" />
-            <p className="font-heading font-semibold text-white">Booking topilmadi</p>
-            <p className="text-xs text-muted-foreground">"{code}" kodi bo'yicha hech narsa yo'q</p>
-          </div>
-        )
+      {bookingId !== undefined && checkIn.isError && (
+        <div className="rounded-xl border border-red-500/20 bg-card">
+          <ErrorState
+            type="generic"
+            title={`Booking #${bookingId} check-in qilinmadi`}
+            description="ID, booking statusi va operator ruxsatini tekshirib qayta urinib ko‘ring."
+          />
+        </div>
       )}
 
-      {/* Recent check-ins */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-border">
-          <h2 className="font-heading font-semibold text-white text-sm">So'nggi Check-Inlar</h2>
-        </div>
-        <div className="divide-y divide-border/50">
-          {mockBookings.filter(b => b.status === 'CHECKED_IN').map(b => (
-            <div key={b.code} className="flex items-center gap-3 p-4">
-              <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-heading text-white">{b.user}</p>
-                <p className="text-xs text-muted-foreground font-mono">{b.code}</p>
-              </div>
+      {booking && (
+        <section className="overflow-hidden rounded-xl border border-emerald-500/25 bg-card">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-muted-foreground">Backend tasdiqlagan booking</p>
+              <h2 className="font-display text-xl font-bold text-foreground">#{booking.id}</h2>
             </div>
-          ))}
-        </div>
-      </div>
+            <StatusBadge status={booking.status} />
+          </div>
+          <dl className="grid gap-4 p-5 sm:grid-cols-2">
+            <div className="rounded-lg bg-muted/30 p-3">
+              <dt className="flex items-center gap-2 text-xs text-muted-foreground"><UserRound className="h-3.5 w-3.5" /> Racer</dt>
+              <dd className="mt-1 text-sm font-semibold text-foreground">{booking.user?.fullName || `User #${booking.userId}`}</dd>
+            </div>
+            <div className="rounded-lg bg-muted/30 p-3">
+              <dt className="flex items-center gap-2 text-xs text-muted-foreground"><Warehouse className="h-3.5 w-3.5" /> Event</dt>
+              <dd className="mt-1 text-sm font-semibold text-foreground">{booking.event?.name || `Event #${booking.eventId}`}</dd>
+            </div>
+            <div className="rounded-lg bg-muted/30 p-3">
+              <dt className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarClock className="h-3.5 w-3.5" /> Slot</dt>
+              <dd className="mt-1 text-sm font-semibold text-foreground">{formatDate(booking.scheduleSlot?.startsAt)}</dd>
+            </div>
+            <div className="rounded-lg bg-muted/30 p-3">
+              <dt className="text-xs text-muted-foreground">Mashina</dt>
+              <dd className="mt-1 text-sm font-semibold text-foreground">{booking.vehicle?.name || (booking.vehicleId ? `Vehicle #${booking.vehicleId}` : 'Biriktirilmagan')}</dd>
+            </div>
+          </dl>
+          <div className="border-t border-border p-5">
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/15 py-3 text-sm font-bold text-emerald-400">
+              <CheckCircle2 className="h-4 w-4" /> Check-in backendda bajarildi
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Home, BookOpen, Flag, QrCode, Users, Menu, X, LogOut, Bell } from 'lucide-react';
+import { Home, BookOpen, Flag, QrCode, Menu, X, LogOut, Bell } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import MobileBottomNav from './MobileBottomNav';
 import { useAuth } from '@/lib/AuthContext';
@@ -20,7 +20,7 @@ export default function OperatorLayout() {
     { path: '/operator/bookings', icon: BookOpen, label: t.bookings },
     { path: '/operator/sessions', icon: Flag,     label: t.raceSessions },
     { path: '/operator/checkin',  icon: QrCode,   label: 'Check-In' },
-    { path: '/operator/racers',   icon: Users,    label: t.users },
+    { path: '/operator/notifications', icon: Bell, label: 'Bildirishnomalar' },
   ];
 
   const isActive = (path: string, exact?: boolean) => exact ? location.pathname === path : location.pathname.startsWith(path);
@@ -80,7 +80,7 @@ export default function OperatorLayout() {
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
             <ThemeToggle />
-            <button className="w-10 h-10 rounded-xl bg-card/60 border border-border/80 backdrop-blur-md flex items-center justify-center text-muted-foreground hover:text-white hover:border-primary/50 shadow-md transition-all duration-300 active:scale-90"><Bell className="w-4 h-4" /></button>
+            <Link to="/operator/notifications" aria-label="Bildirishnomalar" className="w-10 h-10 rounded-xl bg-card/60 border border-border/80 backdrop-blur-md flex items-center justify-center text-muted-foreground hover:text-white hover:border-primary/50 shadow-md transition-all duration-300 active:scale-90"><Bell className="w-4 h-4" /></Link>
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-sm font-heading font-bold text-blue-400">{user?.full_name?.[0] || 'O'}</div>
           </div>
         </header>

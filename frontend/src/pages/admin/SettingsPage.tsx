@@ -1,358 +1,113 @@
-import { useState } from 'react';
-import {
-  Settings, Shield, Bell, Globe, Palette, Database,
-  Save, ChevronRight, Sun, Moon, Monitor, Eye, EyeOff,
-  Key, Mail, Phone, Clock, Flag, Zap
-} from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Braces, Eye, EyeOff, Plus, Search, Settings, SlidersHorizontal, Trash2, Pencil, Power } from 'lucide-react';
+import { settingsApi } from '@/api/settings.api';
+import { queryKeys } from '@/hooks/api/useQueryKeys';
 import PageHeader from '@/components/ui/PageHeader';
-import { useI18n, LOCALES } from '@/lib/i18n';
-import { useTheme } from '@/lib/ThemeContext';
+import { Button } from '@/components/ui/button';
+import { Modal } from '@/components/ui/Modal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { ListItemSkeleton } from '@/components/ui/Skeleton';
+import { toast } from '@/components/ui/use-toast';
+import type { Setting, SettingValue } from '@/types';
 
-type SettingsTab = 'general' | 'security' | 'notifications' | 'appearance';
+type View = 'admin' | 'public';
+type ValueType = 'STRING' | 'NUMBER' | 'BOOLEAN' | 'JSON';
+const inputClass = 'mt-1 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none transition focus:border-primary';
 
-const tabs: { id: SettingsTab; icon: typeof Settings; label: string }[] = [
-  { id: 'general',       icon: Globe,    label: 'Umumiy' },
-  { id: 'security',      icon: Shield,   label: 'Xavfsizlik' },
-  { id: 'notifications', icon: Bell,     label: 'Bildirishnomalar' },
-  { id: 'appearance',    icon: Palette,  label: 'Ko\'rinish' },
-];
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      onClick={() => onChange(!checked)}
-      className={`relative w-10 h-5 rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-muted'}`}
-    >
-      <span
-        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`}
-      />
-    </button>
-  );
+function valueText(value: unknown) {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try { return JSON.stringify(value, null, 2); } catch { return ''; }
 }
 
-function SectionHeader({ title, description }: { title: string; description?: string }) {
-  return (
-    <div className="mb-4">
-      <h2 className="font-heading font-semibold text-foreground tracking-wide">{title}</h2>
-      {description && <p className="text-xs text-muted-foreground mt-0.5 font-heading">{description}</p>}
-    </div>
-  );
+function parseValue(value: string, type: ValueType): SettingValue {
+  if (type === 'NUMBER') return Number(value);
+  if (type === 'BOOLEAN') return value === 'true';
+  if (type === 'JSON') {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed;
+    if (typeof parsed === 'object' && parsed !== null) return parsed as Record<string, unknown>;
+    throw new Error('JSON qiymat object yoki array bo‘lishi kerak.');
+  }
+  return value;
 }
 
-function SettingRow({
-  label, description, children
-}: { label: string; description?: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between py-3.5 border-b border-border/50 last:border-0">
-      <div>
-        <p className="text-sm font-heading font-medium text-foreground">{label}</p>
-        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
-      </div>
-      <div className="flex-shrink-0 ml-4">{children}</div>
-    </div>
-  );
+function messageOf(error: unknown) {
+  return error instanceof Error ? error.message : 'Amalni bajarib bo‘lmadi.';
 }
 
 export default function SettingsPage() {
-  const { t, locale, setLocale } = useI18n();
-  const { theme, setTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
-  const [showApiKey, setShowApiKey] = useState(false);
+  const queryClient = useQueryClient();
+  const [view, setView] = useState<View>('admin');
+  const [search, setSearch] = useState('');
+  const [valueType, setValueType] = useState<'ALL' | ValueType>('ALL');
+  const [selectedId, setSelectedId] = useState<number>();
+  const [editing, setEditing] = useState<Setting>();
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [deleting, setDeleting] = useState<Setting>();
 
-  // Notification toggles
-  const [notifs, setNotifs] = useState({
-    newBooking:   true,
-    cancelBooking: true,
-    raceStart:    true,
-    newUser:      false,
-    payment:      true,
-    systemAlert:  true,
+  const adminQuery = useQuery({
+    queryKey: queryKeys.settings.admin({ search, valueType }),
+    queryFn: () => settingsApi.getAdminSettings({ search: search || undefined, valueType: valueType === 'ALL' ? undefined : valueType, limit: 100, sortBy: 'key', sortOrder: 'asc' }),
+    enabled: view === 'admin',
   });
+  const publicQuery = useQuery({
+    queryKey: queryKeys.settings.public(),
+    queryFn: () => settingsApi.getPublicSettings(),
+    enabled: view === 'public',
+  });
+  const detailQuery = useQuery({
+    queryKey: queryKeys.settings.detail(selectedId ?? ''),
+    queryFn: async () => (await settingsApi.getSettingById(selectedId ?? 0)).data,
+    enabled: view === 'admin' && selectedId !== undefined,
+  });
+  const toggle = useMutation({
+    mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) => settingsApi.toggleSetting(id, isActive),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.all() }),
+    onError: error => toast({ title: 'Xatolik', description: messageOf(error), variant: 'destructive' }),
+  });
+  const remove = useMutation({
+    mutationFn: (id: number) => settingsApi.deleteSetting(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.settings.all() }); setDeleting(undefined); toast({ title: 'Sozlama o‘chirildi' }); },
+    onError: error => toast({ title: 'Xatolik', description: messageOf(error), variant: 'destructive' }),
+  });
+  const activeQuery = view === 'admin' ? adminQuery : publicQuery;
+  const settings = activeQuery.data?.data ?? [];
 
-  // Security state
-  const [twoFA, setTwoFA] = useState(false);
-  const [sessionTimeout, setSessionTimeout] = useState('60');
+  return <div className="space-y-5">
+    <PageHeader title="Sozlamalar" subtitle="Platforma konfiguratsiyasi va public qiymatlar" icon={Settings} actions={view === 'admin' ? <Button onClick={() => { setEditing(undefined); setEditorOpen(true); }}><Plus /> Yangi sozlama</Button> : undefined} />
 
-  // General settings
-  const [arenaName, setArenaName]     = useState('F1RC.UZ Arena');
-  const [arenaEmail, setArenaEmail]   = useState('info@f1rc.uz');
-  const [arenaPhone, setArenaPhone]   = useState('+998 90 123 4567');
-  const [timezone, setTimezone]       = useState('Asia/Tashkent');
-  const [currency, setCurrency]       = useState('USD');
-  const [maxSlots, setMaxSlots]       = useState('20');
-  const [bookingAdvance, setBookingAdvance] = useState('7');
+    <div className="flex gap-2 rounded-2xl border border-border bg-card/70 p-2"><button type="button" onClick={() => setView('admin')} className={`h-11 flex-1 rounded-xl text-sm font-heading font-semibold ${view === 'admin' ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-muted/50'}`}>Admin settings</button><button type="button" onClick={() => setView('public')} className={`h-11 flex-1 rounded-xl text-sm font-heading font-semibold ${view === 'public' ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-muted/50'}`}>Public preview</button></div>
 
-  return (
-    <div className="space-y-5">
-      <PageHeader
-        title={t.settings}
-        subtitle="Tizim sozlamalarini boshqaring"
-        icon={Settings}
-        actions={
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-heading font-semibold hover:bg-primary/90 transition-colors">
-            <Save className="w-4 h-4" />
-            {t.save}
-          </button>
-        }
-      />
+    {view === 'admin' && <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card/70 p-4 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Kalit bo‘yicha qidirish" className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm text-foreground outline-none focus:border-primary" /></div><select value={valueType} onChange={event => setValueType(event.target.value as 'ALL' | ValueType)} className="h-11 rounded-xl border border-border bg-background px-3 text-sm text-foreground"><option value="ALL">Barcha turlar</option>{(['STRING', 'NUMBER', 'BOOLEAN', 'JSON'] as ValueType[]).map(type => <option key={type}>{type}</option>)}</select></section>}
 
-      <div className="flex flex-col lg:flex-row gap-5">
-        {/* Sidebar tabs */}
-        <div className="lg:w-56 flex-shrink-0">
-          <div className="bg-card border border-border rounded-xl p-2 space-y-1 lg:sticky lg:top-20">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-heading font-medium transition-all
-                  ${activeTab === tab.id
-                    ? 'bg-primary/15 text-primary border border-primary/30'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-                {activeTab === tab.id && <ChevronRight className="w-3 h-3 ml-auto" />}
-              </button>
-            ))}
-          </div>
-        </div>
+    {activeQuery.isError ? <ErrorState onRetry={() => activeQuery.refetch()} /> : activeQuery.isLoading ? <div className="space-y-3"><ListItemSkeleton /><ListItemSkeleton /><ListItemSkeleton /></div> : settings.length === 0 ? <EmptyState icon={SlidersHorizontal} title="Sozlamalar yo‘q" /> : <div className="grid gap-4 lg:grid-cols-2">{settings.map(setting => <article key={setting.id} className={`rounded-2xl border bg-card/70 p-4 ${selectedId === setting.id ? 'border-primary' : 'border-border'}`}><button type="button" onClick={() => view === 'admin' && setSelectedId(setting.id)} className="w-full text-left"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-mono text-sm font-bold text-foreground">{setting.key}</p><p className="mt-1 text-xs text-muted-foreground">{setting.description || 'Tavsif yo‘q'}</p></div><span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{setting.valueType}</span></div><pre className="mt-4 max-h-24 overflow-auto whitespace-pre-wrap rounded-xl bg-background p-3 text-xs text-foreground">{valueText(setting.value)}</pre><div className="mt-3 flex gap-2 text-[10px] uppercase tracking-wider"><span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 ${setting.isPublic ? 'border-blue-500/20 bg-blue-500/10 text-blue-400' : 'border-border text-muted-foreground'}`}>{setting.isPublic ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}{setting.isPublic ? 'PUBLIC' : 'PRIVATE'}</span><span className={`rounded-full border px-2 py-1 ${setting.isActive !== false ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-border text-muted-foreground'}`}>{setting.isActive !== false ? 'ACTIVE' : 'INACTIVE'}</span></div></button>{view === 'admin' && <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-3"><Button size="sm" variant="outline" onClick={() => { setEditing(setting); setEditorOpen(true); }}><Pencil /> Tahrirlash</Button><Button size="sm" variant="ghost" onClick={() => toggle.mutate({ id: setting.id, isActive: setting.isActive === false })}><Power /> {setting.isActive === false ? 'Faollashtirish' : 'Nofaol'}</Button><Button size="sm" variant="destructive" onClick={() => setDeleting(setting)}><Trash2 /> O‘chirish</Button></div>}</article>)}</div>}
 
-        {/* Content */}
-        <div className="flex-1 space-y-4">
+    {selectedId && view === 'admin' && <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4"><div className="flex justify-between"><div><p className="text-[10px] uppercase tracking-widest text-primary">Setting detail endpoint</p><p className="mt-1 font-mono text-sm font-bold text-foreground">{detailQuery.isLoading ? 'Yuklanmoqda…' : detailQuery.data?.key}</p></div><button type="button" onClick={() => setSelectedId(undefined)} className="text-xs text-muted-foreground">Yopish</button></div></div>}
+    {editorOpen && <SettingEditor record={editing} onClose={() => setEditorOpen(false)} />}
+    <ConfirmDialog isOpen={Boolean(deleting)} onClose={() => setDeleting(undefined)} onConfirm={() => deleting && remove.mutate(deleting.id)} loading={remove.isPending} title="Sozlamani o‘chirish" message={`${deleting?.key ?? ''} sozlamasi backenddan o‘chiriladi.`} />
+  </div>;
+}
 
-          {/* ── GENERAL ── */}
-          {activeTab === 'general' && (
-            <>
-              {/* Arena info */}
-              <div className="bg-card border border-border rounded-xl p-5">
-                <SectionHeader title="Arena Ma'lumotlari" description="Platformaning asosiy ma'lumotlari" />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {[
-                    { label: 'Arena Nomi', value: arenaName,    set: setArenaName,     icon: Flag,  placeholder: 'F1RC.UZ Arena' },
-                    { label: 'Email',      value: arenaEmail,   set: setArenaEmail,    icon: Mail,  placeholder: 'info@f1rc.uz' },
-                    { label: 'Telefon',    value: arenaPhone,   set: setArenaPhone,    icon: Phone, placeholder: '+998 90 000 0000' },
-                    { label: 'Timezone',   value: timezone,     set: setTimezone,      icon: Clock, placeholder: 'Asia/Tashkent' },
-                  ].map(f => (
-                    <div key={f.label}>
-                      <label className="block text-xs text-muted-foreground font-heading uppercase tracking-widest mb-1.5">{f.label}</label>
-                      <div className="relative">
-                        <f.icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                        <input
-                          value={f.value}
-                          onChange={e => f.set(e.target.value)}
-                          placeholder={f.placeholder}
-                          className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Booking settings */}
-              <div className="bg-card border border-border rounded-xl p-5">
-                <SectionHeader title="Booking Sozlamalari" description="Bron qilish qoidalari" />
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {[
-                    { label: 'Valyuta', value: currency, set: setCurrency, options: ['USD', 'UZS', 'EUR', 'RUB'] },
-                  ].map(f => (
-                    <div key={f.label}>
-                      <label className="block text-xs text-muted-foreground font-heading uppercase tracking-widest mb-1.5">{f.label}</label>
-                      <select
-                        value={f.value}
-                        onChange={e => f.set(e.target.value)}
-                        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
-                      >
-                        {f.options.map(o => <option key={o}>{o}</option>)}
-                      </select>
-                    </div>
-                  ))}
-                  <div>
-                    <label className="block text-xs text-muted-foreground font-heading uppercase tracking-widest mb-1.5">Max Slot (event)</label>
-                    <input
-                      type="number"
-                      value={maxSlots}
-                      onChange={e => setMaxSlots(e.target.value)}
-                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-muted-foreground font-heading uppercase tracking-widest mb-1.5">Oldindan bron (kun)</label>
-                    <input
-                      type="number"
-                      value={bookingAdvance}
-                      onChange={e => setBookingAdvance(e.target.value)}
-                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* API */}
-              <div className="bg-card border border-border rounded-xl p-5">
-                <SectionHeader title="API Kalitlari" description="Backend integratsiyasi uchun kalitlar (ishlab chiqarishda yashiring)" />
-                <div>
-                  <label className="block text-xs text-muted-foreground font-heading uppercase tracking-widest mb-1.5">API Base URL</label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <input
-                        type={showApiKey ? 'text' : 'password'}
-                        defaultValue={import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'}
-                        readOnly
-                        className="w-full pr-10 pl-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground font-mono focus:outline-none"
-                      />
-                      <button onClick={() => setShowApiKey(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                        {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <button className="px-3 py-2 rounded-lg border border-border text-xs font-heading text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors flex items-center gap-1.5">
-                      <Key className="w-3.5 h-3.5" /> Yangilash
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-2 font-heading">
-                    .env faylda VITE_API_BASE_URL orqali o'rnatiladi. Hech qachon frontend kodiga hardcode qilinmasin.
-                  </p>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ── SECURITY ── */}
-          {activeTab === 'security' && (
-            <>
-              <div className="bg-card border border-border rounded-xl p-5">
-                <SectionHeader title="Kirish Xavfsizligi" />
-                <SettingRow label="Ikki faktorli autentifikatsiya (2FA)" description="SMS yoki authenticator orqali qo'shimcha himoya">
-                  <Toggle checked={twoFA} onChange={setTwoFA} />
-                </SettingRow>
-                <SettingRow label="Sessiya vaqti (daqiqa)" description="Harakatsizlikdan keyin avtomatik chiqish">
-                  <select
-                    value={sessionTimeout}
-                    onChange={e => setSessionTimeout(e.target.value)}
-                    className="bg-background border border-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:outline-none focus:border-primary"
-                  >
-                    {['15', '30', '60', '120', '480'].map(v => (
-                      <option key={v} value={v}>{v} daqiqa</option>
-                    ))}
-                  </select>
-                </SettingRow>
-                <SettingRow label="IP filtrlash" description="Faqat ruxsat etilgan IP manzillardan kirish">
-                  <Toggle checked={false} onChange={() => {}} />
-                </SettingRow>
-                <SettingRow label="Audit log" description="Barcha admin harakatlarini loglash">
-                  <Toggle checked={true} onChange={() => {}} />
-                </SettingRow>
-              </div>
-
-              <div className="bg-card border border-border rounded-xl p-5">
-                <SectionHeader title="Parolni o'zgartirish" />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {['Joriy parol', 'Yangi parol', 'Yangi parolni tasdiqlang'].map(label => (
-                    <div key={label} className={label.includes('Joriy') ? '' : ''}>
-                      <label className="block text-xs text-muted-foreground font-heading uppercase tracking-widest mb-1.5">{label}</label>
-                      <input
-                        type="password"
-                        placeholder="••••••••"
-                        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
-                      />
-                    </div>
-                  ))}
-                </div>
-                <button className="mt-4 px-4 py-2 rounded-lg bg-primary/15 border border-primary/30 text-sm font-heading font-semibold text-primary hover:bg-primary/25 transition-colors">
-                  Parolni yangilash
-                </button>
-              </div>
-            </>
-          )}
-
-          {/* ── NOTIFICATIONS ── */}
-          {activeTab === 'notifications' && (
-            <div className="bg-card border border-border rounded-xl p-5">
-              <SectionHeader title="Email Bildirishnomalar" description="Qaysi hodisalar uchun email olasiz" />
-              {[
-                { key: 'newBooking',     label: 'Yangi booking',             desc: 'Yangi bron qilinganida' },
-                { key: 'cancelBooking',  label: 'Bekor qilingan booking',    desc: 'Bron bekor bo\'lganida' },
-                { key: 'raceStart',      label: 'Poyga boshlanishi',         desc: 'Race session boshlanganida' },
-                { key: 'newUser',        label: 'Yangi foydalanuvchi',       desc: 'Yangi user ro\'yxatdan o\'tganida' },
-                { key: 'payment',        label: 'To\'lov',                   desc: 'Muvaffaqiyatli to\'lov amalga oshirilganida' },
-                { key: 'systemAlert',    label: 'Tizim xabardorliklari',     desc: 'Xato yoki muammo yuz berganda' },
-              ].map(n => (
-                <SettingRow key={n.key} label={n.label} description={n.desc}>
-                  <Toggle
-                    checked={notifs[n.key as keyof typeof notifs]}
-                    onChange={v => setNotifs(p => ({ ...p, [n.key]: v }))}
-                  />
-                </SettingRow>
-              ))}
-            </div>
-          )}
-
-          {/* ── APPEARANCE ── */}
-          {activeTab === 'appearance' && (
-            <>
-              <div className="bg-card border border-border rounded-xl p-5">
-                <SectionHeader title="Mavzu" description="Interfeys rangini tanlang" />
-                <div className="flex gap-3 flex-wrap">
-                  {[
-                    { value: 'dark',  label: 'Dark',  icon: Moon,    preview: 'bg-zinc-900' },
-                    { value: 'light', label: 'Light', icon: Sun,     preview: 'bg-zinc-100' },
-                    { value: 'night', label: 'Night', icon: Monitor, preview: 'bg-black' },
-                  ].map(opt => (
-                    <button
-                      key={opt.value}
-                      onClick={() => setTheme(opt.value as 'dark' | 'light' | 'night')}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all w-28
-                        ${theme === opt.value
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border text-muted-foreground hover:border-primary/40'
-                        }`}
-                    >
-                      <div className={`w-12 h-8 rounded-lg ${opt.preview} border border-white/10 flex items-center justify-center`}>
-                        <opt.icon className="w-4 h-4 text-white/60" />
-                      </div>
-                      <span className="text-xs font-heading font-semibold">{opt.label}</span>
-                      {theme === opt.value && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-card border border-border rounded-xl p-5">
-                <SectionHeader title="Til" description="Interfeys tilini tanlang" />
-                <div className="flex gap-3 flex-wrap">
-                  {LOCALES.map(loc => (
-                    <button
-                      key={loc.code}
-                      onClick={() => setLocale(loc.code)}
-                      className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border transition-all
-                        ${locale === loc.code
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                        }`}
-                    >
-                      <span className="text-xl">{loc.flag}</span>
-                      <span className="text-sm font-heading font-semibold">{loc.label}</span>
-                      {locale === loc.code && <div className="w-1.5 h-1.5 rounded-full bg-primary ml-1" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-card border border-border rounded-xl p-5">
-                <SectionHeader title="Sidebar" />
-                <SettingRow label="Compact sidebar" description="Kichikroq va ixchamroq sidebar ko'rinishi">
-                  <Toggle checked={false} onChange={() => {}} />
-                </SettingRow>
-                <SettingRow label="Animatsiyalar" description="UI animatsiya va o'tishlarni yoqish">
-                  <Toggle checked={true} onChange={() => {}} />
-                </SettingRow>
-              </div>
-            </>
-          )}
-
-        </div>
-      </div>
-    </div>
-  );
+function SettingEditor({ record, onClose }: { record?: Setting; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [key, setKey] = useState(record?.key ?? '');
+  const [valueType, setValueType] = useState<ValueType>((record?.valueType as ValueType) ?? 'STRING');
+  const [value, setValue] = useState(valueText(record?.value));
+  const [description, setDescription] = useState(record?.description ?? '');
+  const [isPublic, setIsPublic] = useState(record?.isPublic ?? false);
+  const [isActive, setIsActive] = useState(record?.isActive ?? true);
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const data = { key: key.trim(), value: parseValue(value, valueType), valueType, description: description.trim() || undefined, isPublic, isActive };
+      return record ? settingsApi.updateSetting(record.id, data) : settingsApi.createSetting(data);
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.settings.all() }); onClose(); toast({ title: 'Sozlama saqlandi' }); },
+    onError: error => toast({ title: 'Qiymat xatosi', description: messageOf(error), variant: 'destructive' }),
+  });
+  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); mutation.mutate(); };
+  return <Modal isOpen onClose={onClose} title={record ? 'Sozlamani tahrirlash' : 'Yangi sozlama'} size="lg"><form onSubmit={submit} className="grid gap-4 sm:grid-cols-2"><label className="text-xs text-muted-foreground">Kalit<input required value={key} onChange={event => setKey(event.target.value)} className={inputClass} /></label><label className="text-xs text-muted-foreground">Qiymat turi<select value={valueType} onChange={event => setValueType(event.target.value as ValueType)} className={inputClass}>{(['STRING', 'NUMBER', 'BOOLEAN', 'JSON'] as ValueType[]).map(type => <option key={type}>{type}</option>)}</select></label><label className="sm:col-span-2 text-xs text-muted-foreground">Qiymat{valueType === 'BOOLEAN' ? <select value={value} onChange={event => setValue(event.target.value)} className={inputClass}><option value="true">true</option><option value="false">false</option></select> : <textarea required rows={valueType === 'JSON' ? 6 : 3} value={value} onChange={event => setValue(event.target.value)} className={`${inputClass} h-auto py-3 font-mono`} />}</label><label className="sm:col-span-2 text-xs text-muted-foreground">Tavsif<textarea rows={3} value={description} onChange={event => setDescription(event.target.value)} className={`${inputClass} h-auto py-3`} /></label><label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={isPublic} onChange={event => setIsPublic(event.target.checked)} /> Public</label><label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={isActive} onChange={event => setIsActive(event.target.checked)} /> Active</label><div className="sm:col-span-2 flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Bekor qilish</Button><Button type="submit" disabled={mutation.isPending}><Braces /> Saqlash</Button></div></form></Modal>;
 }

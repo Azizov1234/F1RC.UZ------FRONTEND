@@ -1,73 +1,79 @@
-import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Users, Calendar, BookOpen, Flag, Trophy,
+  Users, Calendar, BookOpen, Flag,
   CreditCard, Activity, ChevronRight, Clock
 } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
 import StatCard from '@/components/admin/StatCard';
 import StatusBadge from '@/components/admin/StatusBadge';
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
-import PremiumIconBox from '@/components/ui/PremiumIconBox';
 import { Button } from '@/components/ui/button';
+import { useUsersQuery } from '@/hooks/api/useUsers';
+import { useEvents } from '@/hooks/api/useEvents';
+import { useBookings } from '@/hooks/api/useBookings';
+import { useVehicles } from '@/hooks/api/useVehicles';
+import { useHealth } from '@/hooks/api/useHealth';
+import { StatCardSkeleton, TableRowSkeleton } from '@/components/ui/Skeleton';
+import { ErrorState } from '@/components/ui/ErrorState';
+import type { Booking } from '@/types';
 
-const mockChartData = [
-  { day: 'Du', bookings: 12, revenue: 450 },
-  { day: 'Se', bookings: 19, revenue: 720 },
-  { day: 'Ch', bookings: 8, revenue: 310 },
-  { day: 'Pa', bookings: 25, revenue: 980 },
-  { day: 'Sh', bookings: 32, revenue: 1240 },
-  { day: 'Ya', bookings: 28, revenue: 1050 },
-  { day: 'Ya', bookings: 15, revenue: 560 },
-];
+function isSameDay(left: Date, right: Date) {
+  return left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate();
+}
 
-const mockRecentBookings = [
-  { id: 1, user: 'Jahongir T.', event: 'Formula RC Sprint', time: '14:30', status: 'CONFIRMED', amount: '$45' },
-  { id: 2, user: 'Sardor M.', event: 'GT Race Night', time: '16:00', status: 'CHECKED_IN', amount: '$60' },
-  { id: 3, user: 'Aziz K.', event: 'Rally Endurance', time: '18:30', status: 'PENDING', amount: '$35' },
-  { id: 4, user: 'Bobur H.', event: 'Formula RC Sprint', time: '14:30', status: 'CANCELLED', amount: '$45' },
-  { id: 5, user: 'Ulugbek N.', event: 'Hypercar Challenge', time: '20:00', status: 'CONFIRMED', amount: '$80' },
-];
-
-const mockTopRacers = [
-  { rank: 1, name: 'Jahongir T.', points: 2840, wins: 12, category: 'Formula RC' },
-  { rank: 2, name: 'Sardor M.', points: 2650, wins: 10, category: 'GT Race' },
-  { rank: 3, name: 'Aziz K.', points: 2410, wins: 8, category: 'Rally' },
-  { rank: 4, name: 'Bobur H.', points: 2180, wins: 7, category: 'Formula RC' },
-  { rank: 5, name: 'Ulugbek N.', points: 1960, wins: 6, category: 'Hypercar' },
-];
+function buildBookingChart(bookings: Booking[]) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - index));
+    const dayBookings = bookings.filter(booking => isSameDay(new Date(booking.createdAt), date));
+    return {
+      day: new Intl.DateTimeFormat('uz-UZ', { weekday: 'short' }).format(date),
+      bookings: dayBookings.length,
+      revenue: dayBookings.reduce((sum, booking) => sum + (booking.amount ?? 0), 0),
+    };
+  });
+}
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({
-    totalUsers: 0, totalEvents: 0, totalBookings: 0,
-    activeRaces: 0, revenue: 0, pendingBookings: 0
-  });
-  const [loading, setLoading] = useState(true);
+  // Parallel fetching via react-query
+  const { data: usersData, isLoading: loadingUsers, isError: errUsers } = useUsersQuery({ limit: 1 });
+  const { data: eventsData, isLoading: loadingEvents, isError: errEvents } = useEvents({ limit: 1 });
+  const { data: bookingsData, isLoading: loadingBookings, isError: errBookings } = useBookings({ limit: 100, sortBy: 'createdAt', sortOrder: 'desc' });
+  const { data: vehiclesData, isLoading: loadingVehicles, isError: errVehicles } = useVehicles();
+  const { data: healthData, isLoading: loadingHealth, isError: errHealth } = useHealth();
 
-  useEffect(() => {
-    const loadStats = async () => {
-      try {
-        const [users, events, bookings] = await Promise.all([
-          base44.entities.User.list('-created_date', 5),
-          base44.entities.Event?.list('-created_date', 100).catch(() => []),
-          base44.entities.Booking?.list('-created_date', 100).catch(() => []),
-        ]);
-        setStats({
-          totalUsers: users?.length || 0,
-          totalEvents: events?.length || 0,
-          totalBookings: bookings?.length || 0,
-          activeRaces: Math.floor(Math.random() * 5),
-          revenue: 4280,
-          pendingBookings: bookings?.filter(b => b.status === 'PENDING')?.length || 0,
-        });
-      } catch (e) {
-        setStats({ totalUsers: 248, totalEvents: 18, totalBookings: 1240, activeRaces: 3, revenue: 42800, pendingBookings: 15 });
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadStats();
-  }, []);
+  const isAnyError = errUsers || errEvents || errBookings || errVehicles;
+  const isAnyLoading = loadingUsers || loadingEvents || loadingBookings || loadingVehicles || loadingHealth;
+
+  const totalUsers = usersData?.meta?.total ?? 0;
+  const totalEvents = eventsData?.meta?.total ?? 0;
+  const totalBookings = bookingsData?.meta?.total ?? 0;
+  const availableVehicles = vehiclesData?.filter(v => v.status === 'AVAILABLE')?.length ?? 0;
+  const pendingBookings = bookingsData?.data?.filter(b => b.status === 'PENDING')?.length ?? 0;
+  const allBookings = bookingsData?.data ?? [];
+  const recentBookings = allBookings.slice(0, 5);
+  const chartData = buildBookingChart(allBookings);
+
+  // Calculate generic revenue based on confirmed/checked_in bookings
+  const revenue = allBookings
+    .filter(booking => booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN' || booking.status === 'COMPLETED')
+    .reduce((sum, booking) => sum + (booking.amount ?? 0), 0);
+
+  const vehicleStatusData = [
+    { label: 'Mavjud', count: vehiclesData?.filter(vehicle => vehicle.status === 'AVAILABLE').length ?? 0, color: 'text-green-400' },
+    { label: 'Band qilingan', count: vehiclesData?.filter(vehicle => vehicle.status === 'RESERVED').length ?? 0, color: 'text-yellow-400' },
+    { label: 'Texnik xizmatda', count: vehiclesData?.filter(vehicle => vehicle.status === 'MAINTENANCE').length ?? 0, color: 'text-blue-400' },
+    { label: 'Faolsiz', count: vehiclesData?.filter(vehicle => vehicle.status === 'DISABLED').length ?? 0, color: 'text-zinc-400' },
+  ];
+
+  if (isAnyError) {
+    return (
+      <div className="p-6 bg-background min-h-[60vh] flex items-center justify-center">
+        <ErrorState type="server" title="Statistika yuklanmadi" description="API so'rovlarida xatolik yuz berdi." />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -79,20 +85,28 @@ export default function Dashboard() {
           </h1>
           <p className="text-xs text-muted-foreground font-heading tracking-wide uppercase mt-1">Bugungi arena holati va ko'rsatkichlar</p>
         </div>
-        <div className="flex items-center gap-2 text-xs bg-green-500/10 border border-green-500/25 rounded-2xl px-4 py-2 w-fit backdrop-blur-md shadow-[0_0_15px_rgba(34,197,94,0.15)] animate-pulse">
-          <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
-          <span className="text-green-400 font-heading font-bold uppercase tracking-wider">3 faol sessiya</span>
+        <div className="flex items-center gap-2 text-xs bg-green-500/10 border border-green-500/25 rounded-2xl px-4 py-2 w-fit backdrop-blur-md shadow-[0_0_15px_rgba(34,197,94,0.15)]">
+          <div className={`w-2.5 h-2.5 rounded-full ${healthData?.status === 'ok' && !errHealth ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'bg-yellow-500'}`} />
+          <span className={`${healthData?.status === 'ok' && !errHealth ? 'text-green-400' : 'text-yellow-400'} font-heading font-bold uppercase tracking-wider`}>
+            {healthData?.status === 'ok' && !errHealth ? 'Tizim Onlayn' : 'Holat tekshirilmoqda'}
+          </span>
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <StatCard title="Foydalanuvchilar" value={loading ? '—' : stats.totalUsers.toLocaleString()} icon={Users} color="red" trendValue="+12% bu oy" trend="up" />
-        <StatCard title="Eventlar" value={loading ? '—' : stats.totalEvents} icon={Calendar} color="blue" subtitle="Rejalashgan" />
-        <StatCard title="Bookinglar" value={loading ? '—' : stats.totalBookings.toLocaleString()} icon={BookOpen} color="green" trendValue="+8% bu hafta" trend="up" />
-        <StatCard title="Aktiv Poygalar" value={loading ? '—' : stats.activeRaces} icon={Flag} color="orange" subtitle="Hozir yurmoqda" />
-        <StatCard title="Daromad" value={`$${loading ? '—' : stats.revenue.toLocaleString()}`} icon={CreditCard} color="yellow" trendValue="+23% bu oy" trend="up" />
-        <StatCard title="Kutilmoqda" value={loading ? '—' : stats.pendingBookings} icon={Activity} color="purple" subtitle="Tasdiqlash kerak" />
+        {isAnyLoading ? (
+          Array.from({ length: 6 }).map((_, i) => <StatCardSkeleton key={i} />)
+        ) : (
+          <>
+            <StatCard title="Foydalanuvchilar" value={totalUsers.toLocaleString()} icon={Users} color="red" />
+            <StatCard title="Eventlar" value={totalEvents} icon={Calendar} color="blue" subtitle="Rejalashgan" />
+            <StatCard title="Bookinglar" value={totalBookings.toLocaleString()} icon={BookOpen} color="green" />
+            <StatCard title="Mavjud Mashinalar" value={availableVehicles} icon={Flag} color="orange" subtitle="Bron qilish mumkin" />
+            <StatCard title="Bronlar Summasi" value={revenue.toLocaleString()} icon={CreditCard} color="yellow" subtitle="Backend amount" />
+            <StatCard title="Kutilmoqda" value={pendingBookings} icon={Activity} color="purple" subtitle="Tasdiqlash kerak" />
+          </>
+        )}
       </div>
 
       {/* Chart + Top Racers */}
@@ -110,7 +124,7 @@ export default function Dashboard() {
             </span>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={mockChartData}>
+            <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="bookingGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(0 90% 50%)" stopOpacity={0.35} />
@@ -128,39 +142,35 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Top Racers */}
+        {/* Vehicle status */}
         <div className="bg-card/60 border border-border/80 rounded-2xl p-5 backdrop-blur-md shadow-lg flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h2 className="font-heading font-bold text-white tracking-wider uppercase flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-yellow-500 animate-bounce" />
-                  Top Racerlar
+                  <Flag className="w-5 h-5 text-primary" />
+                  Avtomobil holati
                 </h2>
-                <p className="text-[10px] text-muted-foreground font-heading tracking-wide uppercase mt-0.5">Mavsum yetakchilari</p>
+                <p className="text-[10px] text-muted-foreground font-heading tracking-wide uppercase mt-0.5">Real inventar taqsimoti</p>
               </div>
-              <Link to="/admin/leaderboard">
+              <Link to="/admin/vehicles">
                 <Button variant="outline" size="sm" className="h-8 rounded-xl px-3 border-primary/20 text-primary hover:text-white hover:border-primary/60">
                   <ChevronRight className="w-4 h-4" />
                 </Button>
               </Link>
             </div>
             <div className="space-y-4">
-              {mockTopRacers.map((racer) => (
-                <div key={racer.rank} className="flex items-center gap-3">
-                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-display font-bold flex-shrink-0 border
-                    ${racer.rank === 1 ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 shadow-[0_0_8px_rgba(234,179,8,0.2)]' :
-                      racer.rank === 2 ? 'bg-zinc-400/10 text-zinc-400 border-zinc-400/20' :
-                        racer.rank === 3 ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                          'bg-white/5 border-border/60 text-muted-foreground'}
-                  `}>{racer.rank}</span>
+              {vehicleStatusData.map((status, index) => (
+                <div key={status.label} className="flex items-center gap-3">
+                  <span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-display font-bold flex-shrink-0 border bg-white/5 border-border/60 text-muted-foreground">
+                    {index + 1}
+                  </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white font-heading font-bold truncate">{racer.name}</p>
-                    <p className="text-[10px] text-muted-foreground font-heading uppercase tracking-wider truncate mt-0.5">{racer.category}</p>
+                    <p className="text-sm text-white font-heading font-bold truncate">{status.label}</p>
+                    <p className="text-[10px] text-muted-foreground font-heading uppercase tracking-wider truncate mt-0.5">Vehicle status</p>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-sm font-display font-bold text-primary">{racer.points.toLocaleString()}</p>
-                    <p className="text-[9px] text-muted-foreground font-heading uppercase tracking-widest mt-0.5">{racer.wins} g'alaba</p>
+                    <p className={`text-lg font-display font-bold ${status.color}`}>{status.count}</p>
                   </div>
                 </div>
               ))}
@@ -194,33 +204,45 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {mockRecentBookings.map((booking, i) => (
-                <tr key={booking.id} className={`border-b border-border/40 hover:bg-white/2 transition-colors duration-200 ${i === mockRecentBookings.length - 1 ? 'border-0' : ''}`}>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-heading font-bold text-primary flex-shrink-0">
-                        {booking.user[0]}
+              {isAnyLoading ? (
+                Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} cols={5} />)
+              ) : (
+                recentBookings.map((booking, i) => (
+                  <tr key={booking.id} className={`border-b border-border/40 hover:bg-white/2 transition-colors duration-200 ${i === recentBookings.length - 1 ? 'border-0' : ''}`}>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-heading font-bold text-primary flex-shrink-0">
+                          {booking.user?.fullName?.[0] || booking.user?.email?.[0] || 'U'}
+                        </div>
+                        <span className="text-sm text-white font-heading font-bold">
+                          {booking.user?.fullName || booking.user?.email || 'Foydalanuvchi'}
+                        </span>
                       </div>
-                      <span className="text-sm text-white font-heading font-bold">{booking.user}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4 hidden md:table-cell">
-                    <span className="text-sm text-muted-foreground font-heading font-medium">{booking.event}</span>
-                  </td>
-                  <td className="px-5 py-4 hidden sm:table-cell">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground font-heading">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span className="font-mono">{booking.time}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <StatusBadge status={booking.status} />
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <span className="text-sm font-display font-bold text-white">{booking.amount}</span>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-5 py-4 hidden md:table-cell">
+                      <span className="text-sm text-muted-foreground font-heading font-medium">
+                        {booking.event?.name || `Event #${booking.eventId}`}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 hidden sm:table-cell">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground font-heading">
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                        <span className="font-mono">
+                          {new Date(booking.createdAt).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <StatusBadge status={booking.status} />
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <span className="text-sm font-display font-bold text-white">
+                        {booking.amount?.toLocaleString() ?? 'вЂ”'} {booking.event?.currency ?? ''}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

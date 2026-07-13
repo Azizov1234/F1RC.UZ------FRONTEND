@@ -1,6 +1,6 @@
 import { type ReactElement } from 'react';
 import { useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
@@ -18,13 +18,15 @@ const DefaultFallback = (): ReactElement => (
 interface ProtectedRouteProps {
   fallback?: ReactElement;
   unauthenticatedElement?: ReactElement;
+  allowedRoles?: string[];
 }
 
 export default function ProtectedRoute({
   fallback = <DefaultFallback />,
   unauthenticatedElement,
+  allowedRoles,
 }: ProtectedRouteProps): ReactElement | null {
-  const { isAuthenticated, isLoadingAuth, authChecked, authError, checkUserAuth } = useAuth();
+  const { isAuthenticated, isLoadingAuth, authChecked, authError, checkUserAuth, user } = useAuth();
 
   useEffect(() => {
     if (!authChecked && !isLoadingAuth) {
@@ -45,6 +47,15 @@ export default function ProtectedRoute({
 
   if (!isAuthenticated) {
     return unauthenticatedElement ?? null;
+  }
+
+  // Role validation
+  if (allowedRoles && user) {
+    const userRole = String(user.role).toUpperCase();
+    const isAllowed = allowedRoles.some(r => r.toUpperCase() === userRole);
+    if (!isAllowed) {
+      return <Navigate to="/403" replace />;
+    }
   }
 
   return <Outlet />;

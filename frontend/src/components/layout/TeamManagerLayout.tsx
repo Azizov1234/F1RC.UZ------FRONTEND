@@ -21,6 +21,7 @@ export default function TeamManagerLayout() {
     { path: '/team-manager/events',    icon: Calendar, label: t.events },
     { path: '/team-manager/standings', icon: Trophy,   label: t.leaderboard },
     { path: '/team-manager/stats',     icon: BarChart2,label: 'Statistika' },
+    { path: '/team-manager/notifications', icon: Bell, label: 'Bildirishnomalar' },
   ];
 
   const isActive = (path: string, exact?: boolean) => exact ? location.pathname === path : location.pathname.startsWith(path);
@@ -80,7 +81,7 @@ export default function TeamManagerLayout() {
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
             <ThemeToggle />
-            <button className="w-10 h-10 rounded-xl bg-card/60 border border-border/88 backdrop-blur-md flex items-center justify-center text-muted-foreground hover:text-white hover:border-primary/50 shadow-md transition-all duration-300 active:scale-90"><Bell className="w-4 h-4" /></button>
+            <Link to="/team-manager/notifications" aria-label="Bildirishnomalar" className="w-10 h-10 rounded-xl bg-card/60 border border-border/88 backdrop-blur-md flex items-center justify-center text-muted-foreground hover:text-white hover:border-primary/50 shadow-md transition-all duration-300 active:scale-90"><Bell className="w-4 h-4" /></Link>
             <div className="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-sm font-heading font-bold text-yellow-400">{user?.full_name?.[0] || 'M'}</div>
           </div>
         </header>

@@ -1,169 +1,204 @@
-// Base44 mock client — API URL envdan olinadi, hardcode qilinmaydi
+/**
+ * Compatibility facade used by the original application shell.
+ * Real backend calls are always preferred. Development mocks are loaded only
+ * when they are explicitly enabled and no backend URL is configured.
+ */
+import { authApi, type RegisterDto, type RegisterResponse } from './auth.api';
+import { settingsApi } from './settings.api';
+import { queryClientInstance } from '../lib/query-client';
+import type { User, UserRole as BackendUserRole } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
-const STORAGE_KEY = 'f1rc_user';
-const TOKEN_KEY = 'f1rc_token';
+export type UserRole = Lowercase<BackendUserRole>;
 
 export interface F1User {
   id: string;
   email: string;
   name: string;
   full_name: string;
-  role: 'admin' | 'superadmin' | 'operator' | 'team_manager' | 'racer' | 'viewer';
+  role: UserRole;
   createdAt: string;
-  created_date?: string; // for UsersPage list compatibility
+  created_date?: string;
   avatar?: string;
 }
 
-interface LoginResult {
-  user?: F1User;
-  error?: string;
+interface LegacyMockUser {
+  id: string;
+  email: string;
+  name: string;
+  full_name: string;
+  role: string;
+  createdAt: string;
+  created_date?: string;
+  avatar?: string;
 }
 
-export type UserRole = F1User['role'];
+const isBackendConfigured = Boolean(import.meta.env.VITE_API_URL);
+const canUseMock =
+  import.meta.env.DEV &&
+  import.meta.env.VITE_ENABLE_MOCKS === 'true' &&
+  !isBackendConfigured;
 
-function getStoredUser(): F1User | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as F1User) : null;
-  } catch {
-    return null;
+if (import.meta.env.PROD && !isBackendConfigured) {
+  throw new Error(
+    '[F1RC] VITE_API_URL is not set. Production requires the real backend API.',
+  );
+}
+
+function normalizeBackendRole(role: BackendUserRole): UserRole {
+  switch (role) {
+    case 'SUPERADMIN':
+      return 'superadmin';
+    case 'ADMIN':
+      return 'admin';
+    case 'OPERATOR':
+      return 'operator';
+    case 'RACER':
+      return 'racer';
+    case 'TEAM_MANAGER':
+      return 'team_manager';
   }
 }
 
-function storeUser(user: F1User): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+function normalizeMockRole(role: string): UserRole | undefined {
+  switch (role.toUpperCase()) {
+    case 'SUPERADMIN':
+      return 'superadmin';
+    case 'ADMIN':
+      return 'admin';
+    case 'OPERATOR':
+      return 'operator';
+    case 'RACER':
+      return 'racer';
+    case 'TEAM_MANAGER':
+      return 'team_manager';
+    default:
+      return undefined;
+  }
 }
 
-function clearUser(): void {
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(TOKEN_KEY);
+function mapBackendUser(user: User): F1User {
+  return {
+    id: String(user.id),
+    email: user.email ?? '',
+    name: user.fullName,
+    full_name: user.fullName,
+    role: normalizeBackendRole(user.role),
+    createdAt: user.createdAt,
+    created_date: user.createdAt,
+    avatar: user.avatarUrl ?? undefined,
+  };
 }
 
-// Demo: rolni emailga qarab aniqlash
-function resolveRole(email: string): UserRole {
-  if (email.includes('superadmin')) return 'superadmin';
-  if (email.includes('operator')) return 'operator';
-  if (email.includes('manager')) return 'team_manager';
-  if (email.includes('racer')) return 'racer';
-  if (email.includes('viewer')) return 'viewer';
-  if (email.includes('admin')) return 'admin';
-  return 'admin'; // default
+function mapMockUser(user: LegacyMockUser | null): F1User | null {
+  if (!user) return null;
+  const role = normalizeMockRole(user.role);
+  if (!role) return null;
+  return { ...user, role };
 }
 
-const mockUsers: F1User[] = [
-  { id: '0', name: 'Super Admin', full_name: 'Super Admin', email: 'superadmin@f1rc.uz', role: 'superadmin', createdAt: '2026-06-01T09:00:00Z', created_date: '2026-06-01T09:00:00Z' },
-  { id: '1', name: 'Jahongir T.', full_name: 'Jahongir T.', email: 'admin@f1rc.uz', role: 'admin', createdAt: '2026-06-01T10:00:00Z', created_date: '2026-06-01T10:00:00Z' },
-  { id: '2', name: 'Sardor M.', full_name: 'Sardor M.', email: 'operator@f1rc.uz', role: 'operator', createdAt: '2026-06-02T11:00:00Z', created_date: '2026-06-02T11:00:00Z' },
-  { id: '3', name: 'Aziz K.', full_name: 'Aziz K.', email: 'manager@f1rc.uz', role: 'team_manager', createdAt: '2026-06-03T12:00:00Z', created_date: '2026-06-03T12:00:00Z' },
-  { id: '4', name: 'Bobur H.', full_name: 'Bobur H.', email: 'racer@f1rc.uz', role: 'racer', createdAt: '2026-06-04T13:00:00Z', created_date: '2026-06-04T13:00:00Z' },
-  { id: '5', name: 'Viewer User', full_name: 'Viewer User', email: 'viewer@f1rc.uz', role: 'viewer', createdAt: '2026-06-05T14:00:00Z', created_date: '2026-06-05T14:00:00Z' },
-];
+async function loadDevelopmentMock() {
+  if (!canUseMock) {
+    throw new Error(
+      '[F1RC] Backend API is not configured and development mocks are disabled.',
+    );
+  }
+  return import('../mocks/base44ClientMock');
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = error.message;
+    if (typeof message === 'string') return message;
+  }
+  return 'Xatolik yuz berdi';
+}
 
 export const base44 = {
-  /** API base URL — env orqali olinadi */
-  apiBaseUrl: API_BASE_URL,
+  apiBaseUrl: import.meta.env.VITE_API_URL ?? '',
 
   auth: {
-    async loginViaEmailPassword(email: string, password: string): Promise<LoginResult> {
-      if (!email || !password) {
-        return { error: 'Email va parol kiritilishi shart' };
+    async loginViaEmailPassword(
+      phone: string,
+      password: string,
+    ): Promise<{ user?: F1User; error?: string }> {
+      if (isBackendConfigured) {
+        try {
+          const response = await authApi.loginViaPhone(phone, password);
+          authApi.setTokens(response.accessToken, response.refreshToken);
+          const user = mapBackendUser(response.user);
+          localStorage.setItem('f1rc_user', JSON.stringify(user));
+          return { user };
+        } catch (error: unknown) {
+          return {
+            error: getErrorMessage(error),
+          };
+        }
       }
-      const name = email.split('@')[0];
-      const user: F1User = {
-        id: 'demo-user-1',
-        email,
-        name,
-        full_name: name,
-        role: resolveRole(email),
-        createdAt: new Date().toISOString(),
-      };
-      storeUser(user);
-      return { user };
+
+      const { base44Mock } = await loadDevelopmentMock();
+      const response = await base44Mock.auth.loginViaEmailPassword(phone, password);
+      const user = mapMockUser(response.user ?? null);
+      return response.error ? { error: response.error } : { user: user ?? undefined };
     },
 
     async getUser(): Promise<F1User | null> {
-      return getStoredUser();
+      if (isBackendConfigured) {
+        const response = await authApi.getUser();
+        const user = mapBackendUser(response.data);
+        localStorage.setItem('f1rc_user', JSON.stringify(user));
+        return user;
+      }
+
+      const { base44Mock } = await loadDevelopmentMock();
+      return mapMockUser(await base44Mock.auth.getUser());
     },
 
-    logout(redirectUrl = '/login'): void {
-      clearUser();
-      window.location.href = redirectUrl;
+    async logout(redirectUrl = '/login'): Promise<void> {
+      if (isBackendConfigured) {
+        try {
+          await authApi.logout();
+        } finally {
+          queryClientInstance.clear();
+        }
+        return;
+      }
+
+      const { base44Mock } = await loadDevelopmentMock();
+      queryClientInstance.clear();
+      base44Mock.auth.logout(redirectUrl);
     },
 
-    async register({ email }: { email: string; password?: string }): Promise<void> {
-      console.log(`Mock registration for ${email}`);
-    },
+    async register(data: RegisterDto): Promise<RegisterResponse | void> {
+      if (isBackendConfigured) {
+        const response = await authApi.register(data);
+        if (response.accessToken && response.refreshToken) {
+          authApi.setTokens(response.accessToken, response.refreshToken);
+        }
+        if (response.user) {
+          localStorage.setItem(
+            'f1rc_user',
+            JSON.stringify(mapBackendUser(response.user)),
+          );
+        }
+        return response;
+      }
 
-    async verifyOtp({ email, otpCode }: { email: string; otpCode: string }): Promise<{ access_token: string }> {
-      console.log(`Mock OTP verification for ${email} with code ${otpCode}`);
-      return { access_token: 'mock-jwt-token' };
+      const { base44Mock } = await loadDevelopmentMock();
+      await base44Mock.auth.register({ email: data.email ?? '' });
     },
 
     setToken(token: string): void {
-      localStorage.setItem(TOKEN_KEY, token);
-    },
-
-    async resendOtp(email: string): Promise<void> {
-      console.log(`Mock resend OTP for ${email}`);
-    },
-
-    loginWithProvider(provider: string, redirectUrl: string): void {
-      console.log(`Mock login with provider ${provider}`);
-      const user: F1User = {
-        id: 'google-user-123',
-        email: 'google.user@example.com',
-        name: 'Google User',
-        full_name: 'Google User',
-        role: 'racer',
-        createdAt: new Date().toISOString(),
-      };
-      storeUser(user);
-      window.location.href = redirectUrl;
-    },
-
-    async resetPasswordRequest(email: string): Promise<void> {
-      console.log(`Mock password reset request for ${email}`);
-    },
-
-    async resetPassword({ resetToken, newPassword }: { resetToken?: string; newPassword?: string }): Promise<void> {
-      console.log(`Mock reset password: token: ${resetToken}, password: ${newPassword}`);
+      authApi.setToken(token);
     },
   },
 
-  users: {
-    async inviteUser(email: string, role: string): Promise<void> {
-      console.log(`Mock invite user: email: ${email}, role: ${role}`);
-    },
-  },
-
-  entities: {
-    User: {
-      async list(sort?: string, limit?: number): Promise<F1User[]> {
-        return mockUsers.slice(0, limit);
-      },
-    },
-    Event: {
-      async list(sort?: string, limit?: number): Promise<any[]> {
-        return [
-          { id: 'e1', title: 'Formula RC Sprint', status: 'UPCOMING', created_date: '2026-06-01T10:00:00Z' },
-          { id: 'e2', title: 'GT Race Night', status: 'ACTIVE', created_date: '2026-06-02T10:00:00Z' },
-          { id: 'e3', title: 'Rally Endurance', status: 'FINISHED', created_date: '2026-06-03T10:00:00Z' },
-        ].slice(0, limit);
-      },
-    },
-    Booking: {
-      async list(sort?: string, limit?: number): Promise<any[]> {
-        return [
-          { id: 'b1', status: 'PENDING', amount: '$45', user: 'Aziz K.', event: 'Rally Endurance' },
-          { id: 'b2', status: 'CONFIRMED', amount: '$60', user: 'Jahongir T.', event: 'Formula RC Sprint' },
-          { id: 'b3', status: 'CHECKED_IN', amount: '$35', user: 'Sardor M.', event: 'GT Race Night' },
-        ].slice(0, limit);
-      },
-    },
-  },
-
-  async getPublicSettings(): Promise<{ siteName: string; theme: string }> {
-    return { siteName: import.meta.env.VITE_APP_NAME ?? 'F1RC.UZ', theme: 'dark' };
+  getPublicSettings() {
+    if (isBackendConfigured) {
+      return settingsApi.getPublicSettings({ limit: 100 });
+    }
+    return loadDevelopmentMock().then(({ base44Mock }) =>
+      base44Mock.getPublicSettings(),
+    );
   },
 };

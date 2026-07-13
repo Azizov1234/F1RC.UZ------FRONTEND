@@ -1,42 +1,77 @@
-import type { LucideIcon } from 'lucide-react';
-import { PackageOpen } from 'lucide-react';
-import PremiumIconBox from '@/components/ui/PremiumIconBox';
-import { Button } from '@/components/ui/button';
+import { type LucideIcon, SearchX, Database } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface EmptyStateProps {
   icon?: LucideIcon;
   title?: string;
   description?: string;
-  action?: {
-    label: string;
-    onClick: () => void;
-  };
+  action?: React.ReactNode;
+  className?: string;
+  size?: 'sm' | 'md' | 'lg';
+  /** Filter natijasi uchun - boshqacha xabar */
+  isFiltered?: boolean;
 }
 
-export default function EmptyState({
-  icon: Icon = PackageOpen,
-  title = 'Ma\'lumot topilmadi',
-  description = 'Hozircha bu yerda hech narsa yo\'q.',
+export function EmptyState({
+  icon: Icon,
+  title,
+  description,
   action,
+  className,
+  size = 'md',
+  isFiltered = false,
 }: EmptyStateProps) {
+  const DefaultIcon = isFiltered ? SearchX : Database;
+  const DisplayIcon = Icon ?? DefaultIcon;
+
+  const defaultTitle = isFiltered
+    ? 'Natija topilmadi'
+    : 'Ma\'lumot yo\'q';
+
+  const defaultDesc = isFiltered
+    ? 'Filter yoki qidiruv parametrlaringizni o\'zgartiring.'
+    : 'Hali birorta yozuv qo\'shilmagan.';
+
+  const iconSize = size === 'sm' ? 'w-8 h-8' : size === 'lg' ? 'w-14 h-14' : 'w-10 h-10';
+  const boxSize = size === 'sm' ? 'w-14 h-14' : size === 'lg' ? 'w-20 h-20' : 'w-16 h-16';
+
   return (
-    <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-card/20 border border-border/60 rounded-3xl backdrop-blur-md max-w-lg mx-auto shadow-xl">
-      <div className="mb-5">
-        <PremiumIconBox icon={Icon} color="zinc" size="lg" glow={true} />
-      </div>
-      <h3 className="text-base font-heading font-bold text-white tracking-wider uppercase mb-1.5">{title}</h3>
-      <p className="text-xs text-muted-foreground font-heading max-w-xs leading-relaxed">{description}</p>
-      {action && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={action.onClick}
-          className="mt-6 border-primary/30 hover:border-primary/60 text-primary hover:text-white"
-        >
-          {action.label}
-        </Button>
+    <div
+      className={cn(
+        'flex flex-col items-center justify-center text-center py-12 px-6',
+        size === 'sm' && 'py-6 px-4',
+        size === 'lg' && 'py-20 px-8',
+        className
       )}
+    >
+      <div
+        className={cn(
+          'rounded-2xl border border-border bg-muted/30 flex items-center justify-center mb-4',
+          boxSize
+        )}
+      >
+        <DisplayIcon
+          className={cn(iconSize, 'text-muted-foreground')}
+          aria-hidden="true"
+          strokeWidth={1.5}
+        />
+      </div>
+
+      <h3 className={cn(
+        'font-heading font-semibold text-foreground mb-1',
+        size === 'sm' ? 'text-sm' : size === 'lg' ? 'text-xl' : 'text-base'
+      )}>
+        {title ?? defaultTitle}
+      </h3>
+
+      <p className={cn(
+        'text-muted-foreground font-body max-w-xs',
+        size === 'sm' ? 'text-xs' : 'text-sm'
+      )}>
+        {description ?? defaultDesc}
+      </p>
+
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }
-
