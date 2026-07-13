@@ -26,7 +26,7 @@ export default function ProtectedRoute({
   unauthenticatedElement,
   allowedRoles,
 }: ProtectedRouteProps): ReactElement | null {
-  const { isAuthenticated, isLoadingAuth, authChecked, authError, checkUserAuth, user } = useAuth();
+  const { isLoadingAuth, authChecked, authError, checkUserAuth, user } = useAuth();
 
   useEffect(() => {
     if (!authChecked && !isLoadingAuth) {
@@ -38,19 +38,16 @@ export default function ProtectedRoute({
     return fallback;
   }
 
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    }
-    return unauthenticatedElement ?? null;
+  if (authError && authError.type === 'user_not_registered') {
+    return <UserNotRegisteredError />;
   }
 
-  if (!isAuthenticated) {
-    return unauthenticatedElement ?? null;
+  if (!user) {
+    return unauthenticatedElement ?? <Navigate to="/login" replace />;
   }
 
   // Role validation
-  if (allowedRoles && user) {
+  if (allowedRoles) {
     const userRole = String(user.role).toUpperCase();
     const isAllowed = allowedRoles.some(r => r.toUpperCase() === userRole);
     if (!isAllowed) {

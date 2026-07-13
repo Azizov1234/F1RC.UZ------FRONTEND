@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Compatibility facade used by the original application shell.
  * Real backend calls are always preferred. Development mocks are loaded only
@@ -6,7 +7,7 @@
 import { authApi, type RegisterDto, type RegisterResponse } from './auth.api';
 import { settingsApi } from './settings.api';
 import { queryClientInstance } from '../lib/query-client';
-import type { User, UserRole as BackendUserRole } from '../types';
+import type { UserRole as BackendUserRole } from '../types';
 
 export type UserRole = Lowercase<BackendUserRole>;
 
@@ -44,8 +45,9 @@ if (import.meta.env.PROD && !isBackendConfigured) {
   );
 }
 
-function normalizeBackendRole(role: BackendUserRole): UserRole {
-  switch (role) {
+function normalizeBackendRole(role: string | BackendUserRole): UserRole {
+  const upperRole = String(role).toUpperCase();
+  switch (upperRole) {
     case 'SUPERADMIN':
       return 'superadmin';
     case 'ADMIN':
@@ -56,6 +58,8 @@ function normalizeBackendRole(role: BackendUserRole): UserRole {
       return 'racer';
     case 'TEAM_MANAGER':
       return 'team_manager';
+    default:
+      return 'racer';
   }
 }
 
@@ -76,16 +80,27 @@ function normalizeMockRole(role: string): UserRole | undefined {
   }
 }
 
-function mapBackendUser(user: User): F1User {
+function mapBackendUser(user: any): F1User {
+  if (!user) {
+    return {
+      id: '',
+      email: '',
+      name: '',
+      full_name: '',
+      role: 'racer',
+      createdAt: '',
+    };
+  }
+  const fullName = user.fullName ?? user.name ?? user.full_name ?? user.phone ?? '';
   return {
-    id: String(user.id),
+    id: String(user.id ?? ''),
     email: user.email ?? '',
-    name: user.fullName,
-    full_name: user.fullName,
-    role: normalizeBackendRole(user.role),
-    createdAt: user.createdAt,
-    created_date: user.createdAt,
-    avatar: user.avatarUrl ?? undefined,
+    name: fullName,
+    full_name: fullName,
+    role: normalizeBackendRole(user.role ?? 'RACER'),
+    createdAt: user.createdAt ?? user.created_date ?? '',
+    created_date: user.createdAt ?? user.created_date ?? '',
+    avatar: user.avatarUrl ?? user.avatar ?? undefined,
   };
 }
 
@@ -125,8 +140,15 @@ export const base44 = {
       if (isBackendConfigured) {
         try {
           const response = await authApi.loginViaPhone(phone, password);
-          authApi.setTokens(response.accessToken, response.refreshToken);
-          const user = mapBackendUser(response.user);
+          const data = (response as any).data ?? response;
+          const accessToken = data.accessToken ?? response.accessToken;
+          const refreshToken = data.refreshToken ?? response.refreshToken;
+          const rawUser = data.user ?? response.user;
+
+          if (accessToken) {
+            authApi.setTokens(accessToken, refreshToken);
+          }
+          const user = mapBackendUser(rawUser);
           localStorage.setItem('f1rc_user', JSON.stringify(user));
           return { user };
         } catch (error: unknown) {
@@ -145,7 +167,9 @@ export const base44 = {
     async getUser(): Promise<F1User | null> {
       if (isBackendConfigured) {
         const response = await authApi.getUser();
-        const user = mapBackendUser(response.data);
+        const rawUser = (response as any).user ?? (response as any).data?.user ?? (response as any).data ?? response;
+        if (!rawUser || typeof rawUser !== 'object') return null;
+        const user = mapBackendUser(rawUser);
         localStorage.setItem('f1rc_user', JSON.stringify(user));
         return user;
       }
@@ -172,13 +196,18 @@ export const base44 = {
     async register(data: RegisterDto): Promise<RegisterResponse | void> {
       if (isBackendConfigured) {
         const response = await authApi.register(data);
-        if (response.accessToken && response.refreshToken) {
-          authApi.setTokens(response.accessToken, response.refreshToken);
+        const resData = (response as any).data ?? response;
+        const accessToken = resData.accessToken ?? response.accessToken;
+        const refreshToken = resData.refreshToken ?? response.refreshToken;
+        const rawUser = resData.user ?? response.user;
+
+        if (accessToken && refreshToken) {
+          authApi.setTokens(accessToken, refreshToken);
         }
-        if (response.user) {
+        if (rawUser) {
           localStorage.setItem(
             'f1rc_user',
-            JSON.stringify(mapBackendUser(response.user)),
+            JSON.stringify(mapBackendUser(rawUser)),
           );
         }
         return response;

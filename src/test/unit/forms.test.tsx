@@ -5,18 +5,27 @@ import Login from '../../pages/Login';
 import { base44 } from '../../api/base44Client';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
+import { AuthProvider } from '../../lib/AuthContext';
 
 // Mock base44 auth client
 vi.mock('../../api/base44Client', () => ({
   base44: {
     auth: {
       loginViaEmailPassword: vi.fn(),
+      getUser: vi.fn().mockResolvedValue(null),
     },
+    getPublicSettings: vi.fn().mockResolvedValue({ siteName: 'F1RC', theme: 'dark' }),
   },
 }));
 
 describe('Login Form tests', () => {
-  const renderLogin = () => render(<MemoryRouter><Login /></MemoryRouter>);
+  const renderLogin = () => render(
+    <AuthProvider>
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>
+    </AuthProvider>
+  );
 
   beforeEach(() => {
     vi.clearAllMocks();

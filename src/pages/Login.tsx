@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { Shield, Eye, EyeOff, Zap, AlertCircle } from 'lucide-react';
 
 // Simple utility — no external validation library needed
@@ -16,6 +17,8 @@ function validatePassword(value: string): string | null {
 }
 
 export default function Login() {
+  const navigate = useNavigate();
+  const { checkUserAuth } = useAuth();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -52,17 +55,21 @@ export default function Login() {
         setLoading(false);
         submittingRef.current = false;
       } else {
+        // Update user state in AuthContext before navigation
+        await checkUserAuth();
+
         // Role-based redirect
         const role = result?.user?.role?.toLowerCase();
+        let targetRoute = '/admin';
         if (role === 'racer') {
-          window.location.href = '/racer';
+          targetRoute = '/racer';
         } else if (role === 'operator') {
-          window.location.href = '/operator';
+          targetRoute = '/operator';
         } else if (role === 'team_manager') {
-          window.location.href = '/team-manager';
-        } else {
-          window.location.href = '/admin';
+          targetRoute = '/team-manager';
         }
+        
+        navigate(targetRoute, { replace: true });
       }
     } catch {
       setError('Tarmoq xatoligi yuz berdi. Qaytadan urinib ko\'ring.');

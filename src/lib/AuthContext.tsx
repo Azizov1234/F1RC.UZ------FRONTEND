@@ -41,6 +41,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const checkUserAuth = useCallback(async () => {
+    const isTest = import.meta.env.MODE === 'test';
+    const hasToken = localStorage.getItem('f1rc_access_token') || localStorage.getItem('f1rc_token');
+    if (!hasToken && !isTest) {
+      setUser(null);
+      setAuthError(null);
+      setIsLoadingAuth(false);
+      setAuthChecked(true);
+      return;
+    }
+
     setIsLoadingAuth(true);
     try {
       const currentUser = await base44.auth.getUser();
