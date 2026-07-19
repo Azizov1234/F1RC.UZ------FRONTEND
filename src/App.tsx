@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClientInstance } from '@/lib/query-client';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ThemeProvider } from '@/lib/ThemeContext';
@@ -15,11 +15,31 @@ import AdminLayout from '@/components/layout/AdminLayout';
 import RacerLayout from '@/components/layout/RacerLayout';
 import OperatorLayout from '@/components/layout/OperatorLayout';
 import TeamManagerLayout from '@/components/layout/TeamManagerLayout';
+import PublicLayout from '@/components/layout/PublicLayout';
 
 // Auth Page (Lazy Loaded)
 const Login = lazy(() => import('@/pages/Login'));
 const Register = lazy(() => import('@/pages/Register'));
 const MyNotificationsPage = lazy(() => import('@/pages/MyNotificationsPage'));
+
+// ── PUBLIC pages (Lazy Loaded) ──
+const LandingPage = lazy(() => import('@/pages/public/LandingPage'));
+const PublicEventsPage = lazy(() => import('@/pages/public/PublicEventsPage'));
+const PublicEventDetailPage = lazy(() => import('@/pages/public/PublicEventDetailPage'));
+const PublicCategoriesPage = lazy(() => import('@/pages/public/PublicCategoriesPage'));
+const PublicCategoryDetailPage = lazy(() => import('@/pages/public/PublicCategoryDetailPage'));
+const PublicVehiclesPage = lazy(() => import('@/pages/public/PublicVehiclesPage'));
+const PublicVehicleDetailPage = lazy(() => import('@/pages/public/PublicVehicleDetailPage'));
+const PublicArenasPage = lazy(() => import('@/pages/public/PublicArenasPage'));
+const PublicArenaDetailPage = lazy(() => import('@/pages/public/PublicArenaDetailPage'));
+const PublicStreamsPage = lazy(() => import('@/pages/public/PublicStreamsPage'));
+const LiveRaceCenterPage = lazy(() => import('@/pages/public/LiveRaceCenterPage'));
+const PublicLeaderboardPage = lazy(() => import('@/pages/public/PublicLeaderboardPage'));
+const PublicTeamsPage = lazy(() => import('@/pages/public/PublicTeamsPage'));
+const PublicTeamDetailPage = lazy(() => import('@/pages/public/PublicTeamDetailPage'));
+const PublicAchievementsPage = lazy(() => import('@/pages/public/PublicAchievementsPage'));
+const AboutPage = lazy(() => import('@/pages/public/AboutPage'));
+const FAQPage = lazy(() => import('@/pages/public/FAQPage'));
 
 // ── ADMIN pages (Lazy Loaded) ──
 const Dashboard = lazy(() => import('@/pages/admin/Dashboard'));
@@ -61,10 +81,9 @@ const OperatorCheckInPage = lazy(() => import('@/pages/operator/OperatorCheckInP
 // ── TEAM MANAGER pages (Lazy Loaded) ──
 const TeamManagerDashboard = lazy(() => import('@/pages/team-manager/TeamManagerDashboard'));
 
-// ── VIEWER pages (Lazy Loaded) ──
 const PermissionDenied = lazy(() => import('@/pages/PermissionDenied'));
 
-import { type F1User } from '@/api/base44Client';
+
 
 // Loading indicator for route transitions
 function PageTransitionLoader() {
@@ -78,46 +97,45 @@ function PageTransitionLoader() {
   );
 }
 
-// Role-based redirect after login
-function RoleRedirect({ user }: { user: F1User | null }) {
-  const role = user?.role?.toLowerCase();
-  if (role === 'admin' || role === 'superadmin') return <Navigate to="/admin" replace />;
-  if (role === 'operator') return <Navigate to="/operator" replace />;
-  if (role === 'team_manager') return <Navigate to="/team-manager" replace />;
-  return <Navigate to="/racer" replace />;
-}
-
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
-
-  if (isLoadingPublicSettings || isLoadingAuth) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background z-50">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-2 border-border border-t-primary rounded-full animate-spin" />
-          <p className="text-xs text-muted-foreground font-display tracking-widest">F1RC.UZ YUKLANMOQDA...</p>
-        </div>
-      </div>
-    );
-  }
+  const { authError } = useAuth();
 
   if (authError) {
     if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
-    if (authError.type === 'auth_required') { navigateToLogin(); return null; }
   }
 
   return (
     <ErrorBoundary>
       <Suspense fallback={<PageTransitionLoader />}>
         <Routes>
+          {/* Auth routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/403" element={<PermissionDenied />} />
 
-          <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
-            {/* Root → role-based redirect */}
-            <Route path="/" element={<RoleRedirect user={user} />} />
+          {/* Public routes */}
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/events" element={<PublicEventsPage />} />
+            <Route path="/events/:id" element={<PublicEventDetailPage />} />
+            <Route path="/categories" element={<PublicCategoriesPage />} />
+            <Route path="/categories/:id" element={<PublicCategoryDetailPage />} />
+            <Route path="/vehicles" element={<PublicVehiclesPage />} />
+            <Route path="/vehicles/:id" element={<PublicVehicleDetailPage />} />
+            <Route path="/arenas" element={<PublicArenasPage />} />
+            <Route path="/arenas/:id" element={<PublicArenaDetailPage />} />
+            <Route path="/streams" element={<PublicStreamsPage />} />
+            <Route path="/live" element={<LiveRaceCenterPage />} />
+            <Route path="/leaderboard" element={<PublicLeaderboardPage />} />
+            <Route path="/teams" element={<PublicTeamsPage />} />
+            <Route path="/teams/:id" element={<PublicTeamDetailPage />} />
+            <Route path="/achievements" element={<PublicAchievementsPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/faq" element={<FAQPage />} />
+          </Route>
 
+          {/* Protected routes */}
+          <Route element={<ProtectedRoute />}>
             {/* ── SUPERADMIN / ADMIN ── */}
             <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPERADMIN']} />}>
               <Route element={<AdminLayout />}>
@@ -184,7 +202,6 @@ const AuthenticatedApp = () => {
               </Route>
             </Route>
 
-            {/* ── VIEWER ── */}
           </Route>
 
           <Route path="*" element={<PageNotFound />} />

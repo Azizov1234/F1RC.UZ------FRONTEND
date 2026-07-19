@@ -108,7 +108,7 @@ export function ErrorState({
         <button
           onClick={onRetry}
           disabled={retrying}
-          className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card/60 text-sm font-heading text-foreground hover:border-primary/40 hover:text-primary transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]"
+          className="mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card/60 text-sm font-heading text-foreground hover:border-primary/40 hover:text-primary transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]"
           aria-label="Qaytadan urinish"
         >
           <RefreshCw

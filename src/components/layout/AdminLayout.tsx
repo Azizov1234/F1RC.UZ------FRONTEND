@@ -56,7 +56,7 @@ export default function AdminLayout() {
     return location.pathname.startsWith(path);
   };
 
-  const handleLogout = () => base44.auth.logout('/login');
+  const handleLogout = () => base44.auth.logout('/');
 
   return (
     <div className="min-h-screen bg-background">

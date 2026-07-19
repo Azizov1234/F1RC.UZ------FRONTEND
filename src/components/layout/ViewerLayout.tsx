@@ -62,7 +62,7 @@ export default function ViewerLayout() {
           })}
         </nav>
         <div className="p-3 border-t border-sidebar-border bg-sidebar-background">
-          <button onClick={() => base44.auth.logout('/login')} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-heading font-semibold uppercase tracking-wider text-muted-foreground hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-300 active:scale-[0.98]">
+          <button onClick={() => base44.auth.logout('/')} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-heading font-semibold uppercase tracking-wider text-muted-foreground hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-300 active:scale-[0.98]">
             <div className="py-1">
               <PremiumIconBox icon={LogOut} color="zinc" size="sm" glow={false} />
             </div>

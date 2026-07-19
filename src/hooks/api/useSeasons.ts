@@ -28,7 +28,7 @@ function invalidateSeasons(queryClient: ReturnType<typeof useQueryClient>): void
 export function usePublicSeasons(params?: GetPublicSeasonsParams, enabled = true) {
   return useQuery({
     queryKey: queryKeys.seasons.list({ ...params, scope: 'public' }),
-    queryFn: () => seasonsApi.getPublicSeasons(params),
+    queryFn: ({ signal }) => seasonsApi.getPublicSeasons(params, { signal }),
     enabled,
     staleTime: 60_000,
   });
@@ -37,7 +37,8 @@ export function usePublicSeasons(params?: GetPublicSeasonsParams, enabled = true
 export function usePublicSeason(id: SeasonId | undefined, enabled = true) {
   return useQuery({
     queryKey: queryKeys.seasons.detail(`public:${id ?? ''}`),
-    queryFn: async () => (await seasonsApi.getPublicSeasonById(requireId(id))).data,
+    queryFn: async ({ signal }) =>
+      (await seasonsApi.getPublicSeasonById(requireId(id), { signal })).data,
     enabled: enabled && hasId(id),
     staleTime: 60_000,
   });

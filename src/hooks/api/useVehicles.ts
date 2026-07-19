@@ -37,7 +37,7 @@ export const useAdminVehicles = useVehicles;
 export function usePublicVehicles(params?: GetPublicVehiclesParams) {
   return useQuery({
     queryKey: queryKeys.vehicles.list({ ...params, scope: 'public' }),
-    queryFn: () => vehiclesApi.getPublicVehicles(params),
+    queryFn: ({ signal }) => vehiclesApi.getPublicVehicles(params, { signal }),
     staleTime: 30_000,
   });
 }
@@ -45,8 +45,11 @@ export function usePublicVehicles(params?: GetPublicVehiclesParams) {
 export function usePublicVehicle(id: VehicleId | undefined) {
   return useQuery({
     queryKey: queryKeys.vehicles.publicDetail(id ?? ''),
-    queryFn: async () => {
-      const response = await vehiclesApi.getPublicVehicleById(requireVehicleId(id));
+    queryFn: async ({ signal }) => {
+      const response = await vehiclesApi.getPublicVehicleById(
+        requireVehicleId(id),
+        { signal },
+      );
       return response.data;
     },
     enabled: hasVehicleId(id),

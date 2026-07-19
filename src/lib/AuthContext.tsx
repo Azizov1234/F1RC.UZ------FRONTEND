@@ -74,6 +74,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkUserAuth();
   }, [checkUserAuth]);
 
+  useEffect(() => {
+    const handleAuthCleared = () => {
+      setUser(null);
+      setAuthError(null);
+      setIsLoadingAuth(false);
+      setAuthChecked(true);
+    };
+
+    window.addEventListener('f1rc:auth-cleared', handleAuthCleared);
+    return () => window.removeEventListener('f1rc:auth-cleared', handleAuthCleared);
+  }, []);
+
   const navigateToLogin = useCallback(() => {
     window.location.href = '/login';
   }, []);

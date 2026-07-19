@@ -1,5 +1,12 @@
 import { ApiClient } from './api';
 import { appendFormField, buildQueryString } from './query';
+import {
+  normalizePublicActive,
+  normalizePublicDetail,
+  normalizePublicPage,
+  type PublicActiveWire,
+  type PublicDetailEnvelope,
+} from './public-response';
 import type { ApiResponse, PaginatedResponse, RacingCategory } from '../types';
 
 export interface GetPublicCategoriesParams {
@@ -40,17 +47,31 @@ function categoryFormData(data: CreateCategoryDto | UpdateCategoryDto): FormData
   return formData;
 }
 
+type PublicCategoryWire = PublicActiveWire<RacingCategory>;
+
+const normalizePublicCategory = (category: PublicCategoryWire): RacingCategory =>
+  normalizePublicActive<RacingCategory>(category);
+
 export const categoriesApi = {
-  getPublicCategories(
+  async getPublicCategories(
     params?: GetPublicCategoriesParams,
+    options?: RequestInit,
   ): Promise<PaginatedResponse<RacingCategory>> {
-    return ApiClient.get(`/categories/public${buildQueryString(params)}`);
+    const response = await ApiClient.get<PaginatedResponse<PublicCategoryWire>>(
+      `/categories/public${buildQueryString(params)}`,
+      options,
+    );
+    return normalizePublicPage(response, normalizePublicCategory);
   },
 
-  getPublicCategoryById(
+  async getPublicCategoryById(
     id: number | string,
+    options?: RequestInit,
   ): Promise<ApiResponse<RacingCategory>> {
-    return ApiClient.get(`/categories/one/${id}`);
+    const response = await ApiClient.get<
+      PublicDetailEnvelope<'category', PublicCategoryWire>
+    >(`/categories/one/${id}`, options);
+    return normalizePublicDetail(response, 'category', normalizePublicCategory);
   },
 
   getAdminCategories(

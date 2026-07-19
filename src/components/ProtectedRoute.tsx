@@ -1,6 +1,6 @@
 import { type ReactElement } from 'react';
 import { useEffect } from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
@@ -27,6 +27,7 @@ export default function ProtectedRoute({
   allowedRoles,
 }: ProtectedRouteProps): ReactElement | null {
   const { isLoadingAuth, authChecked, authError, checkUserAuth, user } = useAuth();
+  const location = useLocation();
 
   useEffect(() => {
     if (!authChecked && !isLoadingAuth) {
@@ -43,7 +44,8 @@ export default function ProtectedRoute({
   }
 
   if (!user) {
-    return unauthenticatedElement ?? <Navigate to="/login" replace />;
+    const redirectPath = encodeURIComponent(location.pathname + location.search);
+    return unauthenticatedElement ?? <Navigate to={`/login?redirect=${redirectPath}`} replace />;
   }
 
   // Role validation

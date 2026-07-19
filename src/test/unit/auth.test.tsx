@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../../lib/AuthContext';
@@ -38,7 +39,7 @@ describe('AuthProvider & AuthContext tests', () => {
     };
 
     vi.spyOn(base44.auth, 'getUser').mockResolvedValue(mockUser);
-    vi.spyOn(base44, 'getPublicSettings').mockResolvedValue({ siteName: 'F1RC', theme: 'dark' });
+    vi.spyOn(base44, 'getPublicSettings').mockResolvedValue({ siteName: 'F1RC', theme: 'dark' } as any);
 
     render(
       <AuthProvider>
@@ -58,7 +59,7 @@ describe('AuthProvider & AuthContext tests', () => {
 
   test('Guest state if base44.auth.getUser() returns null', async () => {
     vi.spyOn(base44.auth, 'getUser').mockResolvedValue(null);
-    vi.spyOn(base44, 'getPublicSettings').mockResolvedValue({ siteName: 'F1RC', theme: 'dark' });
+    vi.spyOn(base44, 'getPublicSettings').mockResolvedValue({ siteName: 'F1RC', theme: 'dark' } as any);
 
     render(
       <AuthProvider>

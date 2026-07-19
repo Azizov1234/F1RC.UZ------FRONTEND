@@ -1,5 +1,12 @@
 import { ApiClient } from './api';
 import { appendFormField, buildQueryString } from './query';
+import {
+  normalizePublicActive,
+  normalizePublicDetail,
+  normalizePublicPage,
+  type PublicActiveWire,
+  type PublicDetailEnvelope,
+} from './public-response';
 import type { ApiResponse, Event, EventStatus, PaginatedResponse } from '../types';
 
 export type PublicEventStatus = Exclude<EventStatus, 'DRAFT' | 'CANCELLED'>;
@@ -66,15 +73,39 @@ function eventFormData(data: CreateEventDto | UpdateEventDto): FormData {
   return formData;
 }
 
+type PublicEventWire = PublicActiveWire<Event>;
+
+function normalizePublicEvent(event: PublicEventWire): Event {
+  const normalized = normalizePublicActive<Event>(event);
+  return {
+    ...normalized,
+    scheduleSlots: normalized.scheduleSlots?.map((slot) => ({
+      ...slot,
+      isActive: slot.isActive ?? true,
+    })),
+  };
+}
+
 export const eventsApi = {
-  getPublicEvents(
+  async getPublicEvents(
     params?: GetPublicEventsParams,
+    options?: RequestInit,
   ): Promise<PaginatedResponse<Event>> {
-    return ApiClient.get(`/events${buildQueryString(params)}`);
+    const response = await ApiClient.get<PaginatedResponse<PublicEventWire>>(
+      `/events${buildQueryString(params)}`,
+      options,
+    );
+    return normalizePublicPage(response, normalizePublicEvent);
   },
 
-  getPublicEventById(id: number | string): Promise<ApiResponse<Event>> {
-    return ApiClient.get(`/events/${id}`);
+  async getPublicEventById(
+    id: number | string,
+    options?: RequestInit,
+  ): Promise<ApiResponse<Event>> {
+    const response = await ApiClient.get<
+      PublicDetailEnvelope<'event', PublicEventWire>
+    >(`/events/${id}`, options);
+    return normalizePublicDetail(response, 'event', normalizePublicEvent);
   },
 
   getAdminEvents(params?: GetEventsParams): Promise<PaginatedResponse<Event>> {

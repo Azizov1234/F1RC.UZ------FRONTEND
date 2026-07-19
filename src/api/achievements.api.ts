@@ -55,8 +55,9 @@ function achievementFormData(
 export const achievementsApi = {
   getPublicAchievements(
     params?: GetAchievementsParams,
+    options?: RequestInit,
   ): Promise<PaginatedResponse<Achievement>> {
-    return ApiClient.get(`/achievements${buildQueryString(params)}`);
+    return ApiClient.get(`/achievements${buildQueryString(params)}`, options);
   },
 
   getAdminAchievements(

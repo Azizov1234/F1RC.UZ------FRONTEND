@@ -24,7 +24,7 @@ function requireAchievementId(id: AchievementId | undefined): AchievementId {
 export function usePublicAchievements(params?: GetAchievementsParams) {
   return useQuery({
     queryKey: queryKeys.achievements.list({ ...params, scope: 'public' }),
-    queryFn: () => achievementsApi.getPublicAchievements(params),
+    queryFn: ({ signal }) => achievementsApi.getPublicAchievements(params, { signal }),
     staleTime: 30_000,
   });
 }

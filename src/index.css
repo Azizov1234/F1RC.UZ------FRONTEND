@@ -151,6 +151,17 @@ button, [role="button"], a {
   touch-action: manipulation;
 }
 
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 3px;
+}
+
+/* Defers below-the-fold paint work while keeping a stable scroll footprint. */
+.landing-deferred {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 560px;
+}
+
 /* ─── Safe area inset support (mobile notch) ─────────────────────────────── */
 :root {
   --safe-area-top: env(safe-area-inset-top, 0px);

@@ -38,8 +38,9 @@ export type UpdateLeaderboardEntryDto = Partial<CreateLeaderboardEntryDto>;
 export const leaderboardApi = {
   getLeaderboard(
     params: GetLeaderboardParams,
+    options?: RequestInit,
   ): Promise<PaginatedResponse<LeaderboardEntry>> {
-    return ApiClient.get(`/leaderboard${buildQueryString(params)}`);
+    return ApiClient.get(`/leaderboard${buildQueryString(params)}`, options);
   },
 
   getAdminLeaderboard(

@@ -23,9 +23,11 @@ function requireId(id: StreamId | undefined): StreamId {
 export function usePublicStreams(params?: GetPublicStreamsParams, enabled = true) {
   return useQuery({
     queryKey: queryKeys.streams.list({ ...params, scope: 'public' }),
-    queryFn: () => streamsApi.getPublicStreams(params),
+    queryFn: ({ signal }) => streamsApi.getPublicStreams(params, { signal }),
     enabled,
     staleTime: 20_000,
+    refetchInterval: params?.status === 'LIVE' ? 15_000 : false,
+    refetchIntervalInBackground: false,
   });
 }
 

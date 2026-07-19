@@ -1,5 +1,12 @@
 import { ApiClient } from './api';
 import { appendFormField, buildQueryString } from './query';
+import {
+  normalizePublicActive,
+  normalizePublicDetail,
+  normalizePublicPage,
+  type PublicActiveWire,
+  type PublicDetailEnvelope,
+} from './public-response';
 import type {
   ApiResponse,
   PaginatedResponse,
@@ -67,15 +74,31 @@ function vehicleFormData(data: CreateVehicleDto | UpdateVehicleDto): FormData {
   return formData;
 }
 
+type PublicVehicleWire = PublicActiveWire<Vehicle>;
+
+const normalizePublicVehicle = (vehicle: PublicVehicleWire): Vehicle =>
+  normalizePublicActive<Vehicle>(vehicle);
+
 export const vehiclesApi = {
-  getPublicVehicles(
+  async getPublicVehicles(
     params?: GetPublicVehiclesParams,
+    options?: RequestInit,
   ): Promise<PaginatedResponse<Vehicle>> {
-    return ApiClient.get(`/vehicles${buildQueryString(params)}`);
+    const response = await ApiClient.get<PaginatedResponse<PublicVehicleWire>>(
+      `/vehicles${buildQueryString(params)}`,
+      options,
+    );
+    return normalizePublicPage(response, normalizePublicVehicle);
   },
 
-  getPublicVehicleById(id: number | string): Promise<ApiResponse<Vehicle>> {
-    return ApiClient.get(`/vehicles/${id}`);
+  async getPublicVehicleById(
+    id: number | string,
+    options?: RequestInit,
+  ): Promise<ApiResponse<Vehicle>> {
+    const response = await ApiClient.get<
+      PublicDetailEnvelope<'vehicle', PublicVehicleWire>
+    >(`/vehicles/${id}`, options);
+    return normalizePublicDetail(response, 'vehicle', normalizePublicVehicle);
   },
 
   getAdminVehicles(

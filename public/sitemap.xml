@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://f1rc.uz/</loc><priority>1.0</priority></url>
+  <url><loc>https://f1rc.uz/events</loc><priority>0.9</priority></url>
+  <url><loc>https://f1rc.uz/categories</loc><priority>0.8</priority></url>
+  <url><loc>https://f1rc.uz/vehicles</loc><priority>0.8</priority></url>
+  <url><loc>https://f1rc.uz/arenas</loc><priority>0.8</priority></url>
+  <url><loc>https://f1rc.uz/streams</loc><priority>0.8</priority></url>
+  <url><loc>https://f1rc.uz/live</loc><priority>0.9</priority></url>
+  <url><loc>https://f1rc.uz/leaderboard</loc><priority>0.9</priority></url>
+  <url><loc>https://f1rc.uz/teams</loc><priority>0.6</priority></url>
+  <url><loc>https://f1rc.uz/achievements</loc><priority>0.7</priority></url>
+  <url><loc>https://f1rc.uz/about</loc><priority>0.6</priority></url>
+  <url><loc>https://f1rc.uz/faq</loc><priority>0.6</priority></url>
+</urlset>

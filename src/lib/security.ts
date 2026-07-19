@@ -52,9 +52,23 @@ export function isValidSafeUrl(url: string): boolean {
 export function isSafeRedirectUrl(url: string): boolean {
   if (!url) return false;
   const trimmed = url.trim();
-  
-  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
-    const lower = trimmed.toLowerCase();
+
+  try {
+    const decoded = decodeURIComponent(trimmed);
+    const hasControlCharacter = Array.from(decoded).some((character) => {
+      const code = character.charCodeAt(0);
+      return code <= 31 || code === 127;
+    });
+    if (
+      !decoded.startsWith('/') ||
+      decoded.startsWith('//') ||
+      decoded.includes('\\') ||
+      hasControlCharacter
+    ) {
+      return false;
+    }
+
+    const lower = decoded.toLowerCase();
     if (
       lower.includes('javascript:') ||
       lower.includes('data:') ||
@@ -65,8 +79,9 @@ export function isSafeRedirectUrl(url: string): boolean {
       return false;
     }
     return true;
+  } catch {
+    return false;
   }
-  return false;
 }
 
 /**

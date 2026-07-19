@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -14,25 +15,29 @@ vi.mock('../../api/base44Client', () => ({
       loginViaEmailPassword: vi.fn(),
       getUser: vi.fn().mockResolvedValue(null),
     },
-    getPublicSettings: vi.fn().mockResolvedValue({ siteName: 'F1RC', theme: 'dark' }),
+    getPublicSettings: vi.fn().mockResolvedValue({ siteName: 'F1RC', theme: 'dark' } as any),
   },
 }));
 
 describe('Login Form tests', () => {
-  const renderLogin = () => render(
-    <AuthProvider>
-      <MemoryRouter>
-        <Login />
-      </MemoryRouter>
-    </AuthProvider>
-  );
+  const renderLogin = async () => {
+    const view = render(
+      <AuthProvider>
+        <MemoryRouter>
+          <Login />
+        </MemoryRouter>
+      </AuthProvider>
+    );
+    await waitFor(() => expect(base44.auth.getUser).toHaveBeenCalled());
+    return view;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   test('displays error messages when fields are submitted empty', async () => {
-    renderLogin();
+    await renderLogin();
 
     // Click submit
     const submitBtn = screen.getByRole('button', { name: /Kirish/i });
@@ -46,7 +51,7 @@ describe('Login Form tests', () => {
   });
 
   test('toggles password visibility when toggle button is clicked', async () => {
-    renderLogin();
+    await renderLogin();
 
     const passwordInput = screen.getByLabelText('Parol');
     expect(passwordInput).toHaveAttribute('type', 'password');
@@ -62,7 +67,7 @@ describe('Login Form tests', () => {
       error: 'Telefon raqami yoki parol noto\'g\'ri',
     });
 
-    renderLogin();
+    await renderLogin();
 
     const phoneInput = screen.getByLabelText('Telefon raqami');
     const passwordInput = screen.getByLabelText('Parol');

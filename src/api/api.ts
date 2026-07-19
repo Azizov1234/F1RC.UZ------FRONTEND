@@ -237,9 +237,10 @@ export class ApiClient {
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(LEGACY_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-    if (import.meta.env.MODE !== 'test' && !window.location.pathname.includes('/login')) {
-      window.location.href = '/login';
-    }
+    // Let the router decide whether the current screen requires authentication.
+    // A public request must never force a guest away from the landing page merely
+    // because the backend returned 401 for that individual resource.
+    window.dispatchEvent(new Event('f1rc:auth-cleared'));
   }
 
   static get<T>(path: string, options?: RequestInit): Promise<T> {

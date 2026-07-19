@@ -1,5 +1,12 @@
 import { ApiClient } from './api';
 import { buildQueryString } from './query';
+import {
+  normalizePublicActive,
+  normalizePublicDetail,
+  normalizePublicPage,
+  type PublicActiveWire,
+  type PublicDetailEnvelope,
+} from './public-response';
 import type { ApiResponse, PaginatedResponse, Season } from '../types';
 
 export interface GetPublicSeasonsParams {
@@ -27,15 +34,31 @@ export interface CreateSeasonDto {
 
 export type UpdateSeasonDto = Partial<CreateSeasonDto>;
 
+type PublicSeasonWire = PublicActiveWire<Season>;
+
+const normalizePublicSeason = (season: PublicSeasonWire): Season =>
+  normalizePublicActive<Season>(season);
+
 export const seasonsApi = {
-  getPublicSeasons(
+  async getPublicSeasons(
     params?: GetPublicSeasonsParams,
+    options?: RequestInit,
   ): Promise<PaginatedResponse<Season>> {
-    return ApiClient.get(`/seasons${buildQueryString(params)}`);
+    const response = await ApiClient.get<PaginatedResponse<PublicSeasonWire>>(
+      `/seasons${buildQueryString(params)}`,
+      options,
+    );
+    return normalizePublicPage(response, normalizePublicSeason);
   },
 
-  getPublicSeasonById(id: number | string): Promise<ApiResponse<Season>> {
-    return ApiClient.get(`/seasons/${id}`);
+  async getPublicSeasonById(
+    id: number | string,
+    options?: RequestInit,
+  ): Promise<ApiResponse<Season>> {
+    const response = await ApiClient.get<
+      PublicDetailEnvelope<'season', PublicSeasonWire>
+    >(`/seasons/${id}`, options);
+    return normalizePublicDetail(response, 'season', normalizePublicSeason);
   },
 
   getAdminSeasons(

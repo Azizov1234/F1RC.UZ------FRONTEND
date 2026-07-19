@@ -29,7 +29,7 @@ function invalidateEvents(queryClient: ReturnType<typeof useQueryClient>): void 
 export function usePublicEvents(params?: GetPublicEventsParams, enabled = true) {
   return useQuery({
     queryKey: queryKeys.events.list({ ...params, scope: 'public' }),
-    queryFn: () => eventsApi.getPublicEvents(params),
+    queryFn: ({ signal }) => eventsApi.getPublicEvents(params, { signal }),
     enabled,
     staleTime: 30_000,
   });
@@ -40,7 +40,8 @@ export const useEvents = usePublicEvents;
 export function usePublicEvent(id: EventId | undefined, enabled = true) {
   return useQuery({
     queryKey: queryKeys.events.detail(`public:${id ?? ''}`),
-    queryFn: async () => (await eventsApi.getPublicEventById(requireId(id))).data,
+    queryFn: async ({ signal }) =>
+      (await eventsApi.getPublicEventById(requireId(id), { signal })).data,
     enabled: enabled && hasId(id),
     staleTime: 30_000,
   });

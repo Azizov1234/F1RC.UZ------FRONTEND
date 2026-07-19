@@ -40,8 +40,9 @@ export type UpdateStreamDto = Partial<CreateStreamDto>;
 export const streamsApi = {
   getPublicStreams(
     params?: GetPublicStreamsParams,
+    options?: RequestInit,
   ): Promise<PaginatedResponse<Stream>> {
-    return ApiClient.get(`/streams${buildQueryString(params)}`);
+    return ApiClient.get(`/streams${buildQueryString(params)}`, options);
   },
 
   getAdminStreams(params?: GetStreamsParams): Promise<PaginatedResponse<Stream>> {

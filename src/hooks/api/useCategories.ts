@@ -37,7 +37,7 @@ export const useAdminCategories = useCategories;
 export function usePublicCategories(params?: GetPublicCategoriesParams) {
   return useQuery({
     queryKey: queryKeys.categories.list({ ...params, scope: 'public' }),
-    queryFn: () => categoriesApi.getPublicCategories(params),
+    queryFn: ({ signal }) => categoriesApi.getPublicCategories(params, { signal }),
     staleTime: 60_000,
   });
 }
@@ -45,8 +45,11 @@ export function usePublicCategories(params?: GetPublicCategoriesParams) {
 export function usePublicCategory(id: CategoryId | undefined) {
   return useQuery({
     queryKey: queryKeys.categories.publicDetail(id ?? ''),
-    queryFn: async () => {
-      const response = await categoriesApi.getPublicCategoryById(requireCategoryId(id));
+    queryFn: async ({ signal }) => {
+      const response = await categoriesApi.getPublicCategoryById(
+        requireCategoryId(id),
+        { signal },
+      );
       return response.data;
     },
     enabled: hasCategoryId(id),

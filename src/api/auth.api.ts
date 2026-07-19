@@ -54,7 +54,7 @@ export const authApi = {
     return ApiClient.get('/auth/me');
   },
 
-  async logout(): Promise<void> {
+  async logout(redirectUrl = '/'): Promise<void> {
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     try {
       if (refreshToken) {
@@ -62,7 +62,7 @@ export const authApi = {
       }
     } finally {
       clearStoredAuth();
-      window.location.href = '/login';
+      window.location.href = redirectUrl;
     }
   },
 

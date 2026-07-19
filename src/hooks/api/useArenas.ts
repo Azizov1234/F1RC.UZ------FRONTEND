@@ -36,7 +36,7 @@ export const useAdminArenas = useArenas;
 export function usePublicArenas(params?: GetPublicArenasParams) {
   return useQuery({
     queryKey: queryKeys.arenas.list({ ...params, scope: 'public' }),
-    queryFn: () => arenasApi.getPublicArenas(params),
+    queryFn: ({ signal }) => arenasApi.getPublicArenas(params, { signal }),
     staleTime: 30_000,
   });
 }
@@ -44,8 +44,10 @@ export function usePublicArenas(params?: GetPublicArenasParams) {
 export function usePublicArena(id: ArenaId | undefined) {
   return useQuery({
     queryKey: queryKeys.arenas.publicDetail(id ?? ''),
-    queryFn: async () => {
-      const response = await arenasApi.getPublicArenaById(requireArenaId(id));
+    queryFn: async ({ signal }) => {
+      const response = await arenasApi.getPublicArenaById(requireArenaId(id), {
+        signal,
+      });
       return response.data;
     },
     enabled: hasArenaId(id),

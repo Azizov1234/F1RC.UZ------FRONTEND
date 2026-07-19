@@ -150,8 +150,16 @@ export interface Arena extends EntityTimestamps {
   coverImageUrl?: string | null;
   isActive: boolean;
   sortOrder: number;
+  /** Public list projection fields returned instead of nested collections. */
+  trackLayoutsCount?: number;
+  zonesCount?: number;
   trackLayouts?: TrackLayout[];
+  /** Live public arena detail field. */
+  zones?: ArenaZone[];
+  /** Normalized alias retained for existing consumers. */
   arenaZones?: ArenaZone[];
+  /** Optional public detail projection when the backend includes related events. */
+  events?: Event[];
 }
 
 export type TrackDifficulty = ExperienceLevel;
@@ -204,6 +212,8 @@ export interface Season extends EntityTimestamps {
   startDate: string;
   endDate: string;
   isActive: boolean;
+  /** Public season projection count. */
+  eventsCount?: number;
 }
 
 export type EventStatus =
@@ -237,6 +247,12 @@ export interface Event extends EntityTimestamps {
   price?: number | null;
   currency?: string | null;
   isActive: boolean;
+  /** Public detail projection fields. */
+  scheduleSlots?: ScheduleSlot[];
+  _count?: {
+    scheduleSlots: number;
+    bookings: number;
+  };
 }
 
 export type ScheduleSlotStatus = 'OPEN' | 'FULL' | 'CLOSED' | 'CANCELLED';

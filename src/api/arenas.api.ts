@@ -1,5 +1,12 @@
 import { ApiClient } from './api';
 import { appendFormField, buildQueryString } from './query';
+import {
+  normalizePublicActive,
+  normalizePublicDetail,
+  normalizePublicPage,
+  type PublicActiveWire,
+  type PublicDetailEnvelope,
+} from './public-response';
 import type { ApiResponse, Arena, PaginatedResponse } from '../types';
 
 export interface GetPublicArenasParams {
@@ -41,15 +48,38 @@ function arenaFormData(data: CreateArenaDto | UpdateArenaDto): FormData {
   return formData;
 }
 
+type PublicArenaWire = PublicActiveWire<Arena>;
+
+function normalizePublicArena(arena: PublicArenaWire): Arena {
+  const normalized = normalizePublicActive<Arena>(arena);
+  const zones = normalized.zones ?? normalized.arenaZones;
+  return {
+    ...normalized,
+    zones,
+    arenaZones: zones,
+  };
+}
+
 export const arenasApi = {
-  getPublicArenas(
+  async getPublicArenas(
     params?: GetPublicArenasParams,
+    options?: RequestInit,
   ): Promise<PaginatedResponse<Arena>> {
-    return ApiClient.get(`/arenas${buildQueryString(params)}`);
+    const response = await ApiClient.get<PaginatedResponse<PublicArenaWire>>(
+      `/arenas${buildQueryString(params)}`,
+      options,
+    );
+    return normalizePublicPage(response, normalizePublicArena);
   },
 
-  getPublicArenaById(id: number | string): Promise<ApiResponse<Arena>> {
-    return ApiClient.get(`/arenas/${id}`);
+  async getPublicArenaById(
+    id: number | string,
+    options?: RequestInit,
+  ): Promise<ApiResponse<Arena>> {
+    const response = await ApiClient.get<
+      PublicDetailEnvelope<'arena', PublicArenaWire>
+    >(`/arenas/${id}`, options);
+    return normalizePublicDetail(response, 'arena', normalizePublicArena);
   },
 
   getAdminArenas(

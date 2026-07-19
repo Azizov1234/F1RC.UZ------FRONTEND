@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Shield, Eye, EyeOff, Zap, AlertCircle } from 'lucide-react';
+import { resolveAuthRedirect } from '@/lib/auth-routing';
 
 // Simple utility — no external validation library needed
 function validatePhone(value: string): string | null {
@@ -18,13 +19,23 @@ function validatePassword(value: string): string | null {
 
 export default function Login() {
   const navigate = useNavigate();
-  const { checkUserAuth } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { checkUserAuth, user, isAuthenticated } = useAuth();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ phone?: string; password?: string }>({});
+
+  // Auto-redirect if already authenticated
+  React.useEffect(() => {
+    if (isAuthenticated && user) {
+      const redirectUrl = searchParams.get('redirect');
+      const target = resolveAuthRedirect(redirectUrl, user.role);
+      navigate(target, { replace: true });
+    }
+  }, [isAuthenticated, user, navigate, searchParams]);
 
   // Prevent duplicate submit
   const submittingRef = useRef(false);
@@ -59,17 +70,12 @@ export default function Login() {
         await checkUserAuth();
 
         // Role-based redirect
-        const role = result?.user?.role?.toLowerCase();
-        let targetRoute = '/admin';
-        if (role === 'racer') {
-          targetRoute = '/racer';
-        } else if (role === 'operator') {
-          targetRoute = '/operator';
-        } else if (role === 'team_manager') {
-          targetRoute = '/team-manager';
-        }
-        
-        navigate(targetRoute, { replace: true });
+        const redirectUrl = searchParams.get('redirect');
+        const target = resolveAuthRedirect(
+          redirectUrl,
+          result?.user?.role,
+        );
+        navigate(target, { replace: true });
       }
     } catch {
       setError('Tarmoq xatoligi yuz berdi. Qaytadan urinib ko\'ring.');
@@ -156,7 +162,7 @@ export default function Login() {
                   placeholder="+998 90 000 00 01"
                   aria-describedby={fieldErrors.phone ? 'phone-error' : undefined}
                   aria-invalid={!!fieldErrors.phone}
-                  className={`w-full bg-background border rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors ${
+                  className={`min-h-11 w-full bg-background border rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors ${
                     fieldErrors.phone ? 'border-red-500/60 focus:ring-red-500/30' : 'border-border focus:border-primary'
                   }`}
                 />
@@ -189,14 +195,14 @@ export default function Login() {
                     placeholder="••••••••"
                     aria-describedby={fieldErrors.password ? 'password-error' : undefined}
                     aria-invalid={!!fieldErrors.password}
-                    className={`w-full bg-background border rounded-lg px-4 py-2.5 pr-11 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors ${
+                    className={`min-h-11 w-full bg-background border rounded-lg px-4 py-2.5 pr-12 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors ${
                       fieldErrors.password ? 'border-red-500/60 focus:ring-red-500/30' : 'border-border focus:border-primary'
                     }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPass(!showPass)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors p-0.5 rounded"
+                    className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-white transition-colors"
                     aria-label={showPass ? 'Parolni yashirish' : 'Parolni ko\'rsatish'}
                   >
                     {showPass ? (
@@ -221,7 +227,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-2.5 text-sm font-heading font-semibold transition-all duration-200 flex items-center justify-center gap-2 mt-2 active:scale-[0.97] shadow-[0_4px_14px_0_rgba(255,0,0,0.3)] hover:shadow-[0_6px_20px_0_rgba(255,0,0,0.4)]"
+                className="min-h-11 w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-2.5 text-sm font-heading font-semibold transition-all duration-200 flex items-center justify-center gap-2 mt-2 active:scale-[0.97] shadow-[0_4px_14px_0_rgba(255,0,0,0.3)] hover:shadow-[0_6px_20px_0_rgba(255,0,0,0.4)]"
                 aria-busy={loading}
               >
                 {loading ? (

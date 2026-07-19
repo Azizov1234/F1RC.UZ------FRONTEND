@@ -34,6 +34,22 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
+const intersectionObserverMock = vi.fn(() => ({
+  root: null,
+  rootMargin: '0px',
+  thresholds: [0],
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+  takeRecords: vi.fn(() => []),
+}));
+
+Object.defineProperty(globalThis, 'IntersectionObserver', {
+  writable: true,
+  configurable: true,
+  value: intersectionObserverMock,
+});
+
 // Clean up after each test
 afterEach(() => {
   window.localStorage.clear();

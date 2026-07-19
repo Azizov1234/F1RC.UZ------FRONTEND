@@ -1,10 +1,16 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../lib/AuthContext';
 import type { F1User } from '../../api/base44Client';
 import React from 'react';
+import { dashboardPathForRole, resolveAuthRedirect } from '../../lib/auth-routing';
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname}{location.search}</div>;
+}
 
 // Mock useAuth
 vi.mock('../../lib/AuthContext', () => ({
@@ -91,5 +97,30 @@ describe('ProtectedRoute Role-Based Routing tests', () => {
     );
 
     expect(screen.getByText('Redirect to Login')).toBeInTheDocument();
+  });
+
+  test('preserves the requested protected path in the login redirect', () => {
+    vi.mocked(useAuth).mockReturnValue(authState({ isAuthenticated: false, user: null }));
+
+    render(
+      <MemoryRouter initialEntries={['/admin/users?page=2']}>
+        <Routes>
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+            <Route path="/admin/users" element={<div>Admin users</div>} />
+          </Route>
+          <Route path="/login" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/login?redirect=%2Fadmin%2Fusers%3Fpage%3D2');
+  });
+
+  test('uses only safe internal login redirects and otherwise falls back by role', () => {
+    expect(resolveAuthRedirect('/events/9', 'RACER')).toBe('/events/9');
+    expect(resolveAuthRedirect('https://evil.example', 'RACER')).toBe('/racer');
+    expect(resolveAuthRedirect('/%5Cevil.example', 'RACER')).toBe('/racer');
+    expect(dashboardPathForRole('TEAM_MANAGER')).toBe('/team-manager');
+    expect(dashboardPathForRole('VIEWER')).toBe('/');
   });
 });

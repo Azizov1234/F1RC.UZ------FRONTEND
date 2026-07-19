@@ -34,8 +34,19 @@ export function useLogin() {
 }
 
 export function useRegister() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: authApi.register,
+    onSuccess: (data) => {
+      if (data.accessToken) {
+        if (data.refreshToken) authApi.setTokens(data.accessToken, data.refreshToken);
+        else authApi.setToken(data.accessToken);
+      }
+      if (data.user) {
+        localStorage.setItem('f1rc_user', JSON.stringify(data.user));
+        queryClient.setQueryData(queryKeys.auth.user(), data.user);
+      }
+    },
   });
 }
 

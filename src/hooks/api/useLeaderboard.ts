@@ -36,11 +36,11 @@ function hasValidLeaderboardParams(
 export function useLeaderboard(params: GetLeaderboardParams | undefined) {
   return useQuery({
     queryKey: queryKeys.leaderboard.public({ ...params }),
-    queryFn: () => {
+    queryFn: ({ signal }) => {
       if (!hasValidLeaderboardParams(params)) {
         throw new Error('Leaderboard requires a valid season and category');
       }
-      return leaderboardApi.getLeaderboard(params);
+      return leaderboardApi.getLeaderboard(params, { signal });
     },
     enabled: hasValidLeaderboardParams(params),
     staleTime: 15_000,

@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Compatibility facade used by the original application shell.
- * Real backend calls are always preferred. Development mocks are loaded only
- * when they are explicitly enabled and no backend URL is configured.
+ * Real backend calls are always preferred and executed.
  */
 import { authApi, type RegisterDto, type RegisterResponse } from './auth.api';
 import { settingsApi } from './settings.api';
@@ -22,26 +21,9 @@ export interface F1User {
   avatar?: string;
 }
 
-interface LegacyMockUser {
-  id: string;
-  email: string;
-  name: string;
-  full_name: string;
-  role: string;
-  createdAt: string;
-  created_date?: string;
-  avatar?: string;
-}
-
-const isBackendConfigured = Boolean(import.meta.env.VITE_API_URL);
-const canUseMock =
-  import.meta.env.DEV &&
-  import.meta.env.VITE_ENABLE_MOCKS === 'true' &&
-  !isBackendConfigured;
-
-if (import.meta.env.PROD && !isBackendConfigured) {
+if (!import.meta.env.VITE_API_URL) {
   throw new Error(
-    '[F1RC] VITE_API_URL is not set. Production requires the real backend API.',
+    '[F1RC] VITE_API_URL is not set. The application requires the real backend API.',
   );
 }
 
@@ -60,23 +42,6 @@ function normalizeBackendRole(role: string | BackendUserRole): UserRole {
       return 'team_manager';
     default:
       return 'racer';
-  }
-}
-
-function normalizeMockRole(role: string): UserRole | undefined {
-  switch (role.toUpperCase()) {
-    case 'SUPERADMIN':
-      return 'superadmin';
-    case 'ADMIN':
-      return 'admin';
-    case 'OPERATOR':
-      return 'operator';
-    case 'RACER':
-      return 'racer';
-    case 'TEAM_MANAGER':
-      return 'team_manager';
-    default:
-      return undefined;
   }
 }
 
@@ -104,22 +69,6 @@ function mapBackendUser(user: any): F1User {
   };
 }
 
-function mapMockUser(user: LegacyMockUser | null): F1User | null {
-  if (!user) return null;
-  const role = normalizeMockRole(user.role);
-  if (!role) return null;
-  return { ...user, role };
-}
-
-async function loadDevelopmentMock() {
-  if (!canUseMock) {
-    throw new Error(
-      '[F1RC] Backend API is not configured and development mocks are disabled.',
-    );
-  }
-  return import('../mocks/base44ClientMock');
-}
-
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'object' && error !== null && 'message' in error) {
@@ -137,84 +86,60 @@ export const base44 = {
       phone: string,
       password: string,
     ): Promise<{ user?: F1User; error?: string }> {
-      if (isBackendConfigured) {
-        try {
-          const response = await authApi.loginViaPhone(phone, password);
-          const data = (response as any).data ?? response;
-          const accessToken = data.accessToken ?? response.accessToken;
-          const refreshToken = data.refreshToken ?? response.refreshToken;
-          const rawUser = data.user ?? response.user;
+      try {
+        const response = await authApi.loginViaPhone(phone, password);
+        const data = (response as any).data ?? response;
+        const accessToken = data.accessToken ?? response.accessToken;
+        const refreshToken = data.refreshToken ?? response.refreshToken;
+        const rawUser = data.user ?? response.user;
 
-          if (accessToken) {
-            authApi.setTokens(accessToken, refreshToken);
-          }
-          const user = mapBackendUser(rawUser);
-          localStorage.setItem('f1rc_user', JSON.stringify(user));
-          return { user };
-        } catch (error: unknown) {
-          return {
-            error: getErrorMessage(error),
-          };
+        if (accessToken) {
+          authApi.setTokens(accessToken, refreshToken);
         }
+        const user = mapBackendUser(rawUser);
+        localStorage.setItem('f1rc_user', JSON.stringify(user));
+        return { user };
+      } catch (error: unknown) {
+        return {
+          error: getErrorMessage(error),
+        };
       }
-
-      const { base44Mock } = await loadDevelopmentMock();
-      const response = await base44Mock.auth.loginViaEmailPassword(phone, password);
-      const user = mapMockUser(response.user ?? null);
-      return response.error ? { error: response.error } : { user: user ?? undefined };
     },
 
     async getUser(): Promise<F1User | null> {
-      if (isBackendConfigured) {
-        const response = await authApi.getUser();
-        const rawUser = (response as any).user ?? (response as any).data?.user ?? (response as any).data ?? response;
-        if (!rawUser || typeof rawUser !== 'object') return null;
-        const user = mapBackendUser(rawUser);
-        localStorage.setItem('f1rc_user', JSON.stringify(user));
-        return user;
-      }
-
-      const { base44Mock } = await loadDevelopmentMock();
-      return mapMockUser(await base44Mock.auth.getUser());
+      const response = await authApi.getUser();
+      const rawUser = (response as any).user ?? (response as any).data?.user ?? (response as any).data ?? response;
+      if (!rawUser || typeof rawUser !== 'object') return null;
+      const user = mapBackendUser(rawUser);
+      localStorage.setItem('f1rc_user', JSON.stringify(user));
+      return user;
     },
 
-    async logout(redirectUrl = '/login'): Promise<void> {
-      if (isBackendConfigured) {
-        try {
-          await authApi.logout();
-        } finally {
-          queryClientInstance.clear();
-        }
-        return;
+    async logout(redirectUrl = '/'): Promise<void> {
+      try {
+        await authApi.logout(redirectUrl);
+      } finally {
+        queryClientInstance.clear();
       }
-
-      const { base44Mock } = await loadDevelopmentMock();
-      queryClientInstance.clear();
-      base44Mock.auth.logout(redirectUrl);
     },
 
     async register(data: RegisterDto): Promise<RegisterResponse | void> {
-      if (isBackendConfigured) {
-        const response = await authApi.register(data);
-        const resData = (response as any).data ?? response;
-        const accessToken = resData.accessToken ?? response.accessToken;
-        const refreshToken = resData.refreshToken ?? response.refreshToken;
-        const rawUser = resData.user ?? response.user;
+      const response = await authApi.register(data);
+      const resData = (response as any).data ?? response;
+      const accessToken = resData.accessToken ?? response.accessToken;
+      const refreshToken = resData.refreshToken ?? response.refreshToken;
+      const rawUser = resData.user ?? response.user;
 
-        if (accessToken && refreshToken) {
-          authApi.setTokens(accessToken, refreshToken);
-        }
-        if (rawUser) {
-          localStorage.setItem(
-            'f1rc_user',
-            JSON.stringify(mapBackendUser(rawUser)),
-          );
-        }
-        return response;
+      if (accessToken && refreshToken) {
+        authApi.setTokens(accessToken, refreshToken);
       }
-
-      const { base44Mock } = await loadDevelopmentMock();
-      await base44Mock.auth.register({ email: data.email ?? '' });
+      if (rawUser) {
+        localStorage.setItem(
+          'f1rc_user',
+          JSON.stringify(mapBackendUser(rawUser)),
+        );
+      }
+      return response;
     },
 
     setToken(token: string): void {
@@ -223,11 +148,6 @@ export const base44 = {
   },
 
   getPublicSettings() {
-    if (isBackendConfigured) {
-      return settingsApi.getPublicSettings({ limit: 100 });
-    }
-    return loadDevelopmentMock().then(({ base44Mock }) =>
-      base44Mock.getPublicSettings(),
-    );
+    return settingsApi.getPublicSettings({ limit: 100 });
   },
 };
