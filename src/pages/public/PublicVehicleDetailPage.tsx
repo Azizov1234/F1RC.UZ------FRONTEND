@@ -4,6 +4,7 @@ import { Car, ArrowLeft, Battery, Gauge, Settings } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { getFileUrl } from '@/lib/getFileUrl';
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
 export default function PublicVehicleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -44,7 +45,7 @@ export default function PublicVehicleDetailPage() {
           {/* Column 1: Image container */}
           <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-xl flex flex-col justify-center items-center p-6 min-h-[300px]">
             {vehicle.imageUrl ? (
-              <img src={getFileUrl(vehicle.imageUrl)} alt={vehicle.name} className="max-h-64 object-contain rounded-2xl" />
+              <ImageWithFallback src={getFileUrl(vehicle.imageUrl)} fallbackType="vehicle" alt={vehicle.name} className="max-h-64 object-contain rounded-2xl" />
             ) : (
               <Car className="w-24 h-24 text-muted-foreground" />
             )}

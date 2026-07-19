@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
 interface LandingSectionStateProps {
   loading: boolean;
@@ -321,8 +322,9 @@ export default function LandingPage() {
               <div key={cat.id} className="bg-card border border-border rounded-2xl p-5 shadow-lg flex flex-col justify-between group hover:border-primary/20 transition-all duration-300">
                 {cat.imageUrl && (
                   <div className="mb-4 aspect-video overflow-hidden rounded-xl border border-border bg-muted">
-                    <img
+                    <ImageWithFallback
                       src={getFileUrl(cat.imageUrl)}
+                      fallbackType="category"
                       alt={cat.name}
                       loading="lazy"
                       decoding="async"
@@ -442,7 +444,7 @@ export default function LandingPage() {
                 <div key={event.id} className="bg-card border border-border rounded-3xl overflow-hidden shadow-lg flex flex-col justify-between transition-all duration-300 hover:border-primary/20 group">
                   <div className="h-44 bg-muted relative overflow-hidden flex items-center justify-center">
                     {event.coverImageUrl ? (
-                      <img src={getFileUrl(event.coverImageUrl)} alt={event.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <ImageWithFallback src={getFileUrl(event.coverImageUrl)} fallbackType="event" alt={event.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     ) : (
                       <Calendar className="w-10 h-10 text-muted-foreground" />
                     )}
@@ -529,7 +531,7 @@ export default function LandingPage() {
                 <div key={stream.id} className="bg-card border border-border rounded-3xl overflow-hidden shadow-lg group hover:border-primary/20 transition-all duration-300">
                   <div className="aspect-video bg-muted relative overflow-hidden flex items-center justify-center">
                     {stream.event?.coverImageUrl ? (
-                      <img src={getFileUrl(stream.event.coverImageUrl)} alt={stream.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                      <ImageWithFallback src={getFileUrl(stream.event.coverImageUrl)} fallbackType="stream" alt={stream.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     ) : (
                       <Radio className="w-12 h-12 text-muted-foreground" />
                     )}
@@ -702,7 +704,7 @@ export default function LandingPage() {
                   </span>
                   <div className="w-12 h-12 overflow-hidden rounded-full bg-muted flex items-center justify-center font-heading font-bold text-white">
                     {entry.user?.avatarUrl ? (
-                      <img src={getFileUrl(entry.user.avatarUrl)} alt={entry.user.fullName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                      <ImageWithFallback src={getFileUrl(entry.user.avatarUrl)} fallbackType="avatar" alt={entry.user.fullName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     ) : (
                       entry.user?.fullName?.[0] || '?'
                     )}
@@ -761,7 +763,7 @@ export default function LandingPage() {
               <div key={arena.id} className="bg-card border border-border rounded-3xl overflow-hidden shadow-lg group hover:border-primary/20 transition-all duration-300">
                 <div className="h-40 bg-muted relative overflow-hidden flex items-center justify-center">
                   {arena.coverImageUrl ? (
-                    <img src={getFileUrl(arena.coverImageUrl)} alt={arena.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                    <ImageWithFallback src={getFileUrl(arena.coverImageUrl)} fallbackType="arena" alt={arena.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   ) : (
                     <MapPin className="w-10 h-10 text-muted-foreground" />
                   )}
@@ -848,7 +850,7 @@ export default function LandingPage() {
               <div key={ach.id} className="bg-card border border-border rounded-2xl p-5 flex gap-4 items-center relative overflow-hidden">
                 <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
                   {ach.iconUrl ? (
-                    <img src={getFileUrl(ach.iconUrl)} alt={ach.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                    <ImageWithFallback src={getFileUrl(ach.iconUrl)} fallbackType="category" alt={ach.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   ) : (
                     <Award className="w-6 h-6 text-muted-foreground" />
                   )}

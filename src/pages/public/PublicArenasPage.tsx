@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getFileUrl } from '@/lib/getFileUrl';
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
 export default function PublicArenasPage() {
   const { data: arenas, isLoading, isError, refetch } = usePublicArenas({ limit: 100 });
@@ -51,7 +52,7 @@ export default function PublicArenasPage() {
               {/* Cover Image */}
               <div className="h-48 bg-muted relative overflow-hidden flex items-center justify-center">
                 {arena.coverImageUrl ? (
-                  <img src={getFileUrl(arena.coverImageUrl)} alt={arena.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <ImageWithFallback src={getFileUrl(arena.coverImageUrl)} fallbackType="arena" alt={arena.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 ) : (
                   <MapPin className="w-12 h-12 text-muted-foreground" />
                 )}

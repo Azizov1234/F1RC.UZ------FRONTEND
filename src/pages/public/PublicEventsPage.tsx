@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 import { getFileUrl } from '@/lib/getFileUrl';
 import { format } from 'date-fns';
 
@@ -80,7 +81,7 @@ export default function PublicEventsPage() {
                 {/* Cover Image */}
                 <div className="h-48 bg-muted relative overflow-hidden flex items-center justify-center">
                   {event.coverImageUrl ? (
-                    <img src={getFileUrl(event.coverImageUrl)} alt={event.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <ImageWithFallback src={getFileUrl(event.coverImageUrl)} fallbackType="event" alt={event.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   ) : (
                     <Calendar className="w-12 h-12 text-muted-foreground" />
                   )}

@@ -6,6 +6,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getFileUrl } from '@/lib/getFileUrl';
 import { isValidSafeUrl } from '@/lib/security';
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
 export default function PublicStreamsPage() {
   const { data: streams, isLoading, isError, refetch } = usePublicStreams({ limit: 100 });
@@ -55,7 +56,7 @@ export default function PublicStreamsPage() {
                 {/* Cover/Thumbnail */}
                 <div className="aspect-video bg-muted relative flex items-center justify-center overflow-hidden">
                   {stream.event?.coverImageUrl ? (
-                    <img src={getFileUrl(stream.event.coverImageUrl)} alt={stream.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                    <ImageWithFallback src={getFileUrl(stream.event.coverImageUrl)} fallbackType="stream" alt={stream.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   ) : (
                     <Radio className="w-12 h-12 text-muted-foreground" />
                   )}

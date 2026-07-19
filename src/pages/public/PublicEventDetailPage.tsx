@@ -7,6 +7,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { getFileUrl } from '@/lib/getFileUrl';
 import { format } from 'date-fns';
 import SEO from '@/components/SEO';
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
 export default function PublicEventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -86,7 +87,7 @@ export default function PublicEventDetailPage() {
           <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-xl">
             <div className="h-64 sm:h-80 bg-muted relative flex items-center justify-center">
               {event.coverImageUrl ? (
-                <img src={getFileUrl(event.coverImageUrl)} alt={event.name} className="w-full h-full object-cover" />
+                <ImageWithFallback src={getFileUrl(event.coverImageUrl)} fallbackType="event" alt={event.name} className="w-full h-full object-cover" />
               ) : (
                 <Calendar className="w-16 h-16 text-muted-foreground" />
               )}

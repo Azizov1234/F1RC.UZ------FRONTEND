@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getFileUrl } from '@/lib/getFileUrl';
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
 export default function PublicCategoriesPage() {
   const [search, setSearch] = useState('');
@@ -71,8 +72,9 @@ export default function PublicCategoriesPage() {
             >
               <div className="mb-5 aspect-video overflow-hidden rounded-xl border border-border bg-muted">
                 {category.imageUrl ? (
-                  <img
+                  <ImageWithFallback
                     src={getFileUrl(category.imageUrl)}
+                    fallbackType="category"
                     alt={category.name}
                     loading="lazy"
                     decoding="async"

@@ -4,6 +4,7 @@ import { MapPin, ArrowLeft, Layers, Compass } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { getFileUrl } from '@/lib/getFileUrl';
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
 export default function PublicArenaDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -45,7 +46,7 @@ export default function PublicArenaDetailPage() {
           <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-xl">
             <div className="h-64 sm:h-80 bg-muted relative flex items-center justify-center">
               {arena.coverImageUrl ? (
-                <img src={getFileUrl(arena.coverImageUrl)} alt={arena.name} className="w-full h-full object-cover" />
+                <ImageWithFallback src={getFileUrl(arena.coverImageUrl)} fallbackType="arena" alt={arena.name} className="w-full h-full object-cover" />
               ) : (
                 <MapPin className="w-16 h-16 text-muted-foreground" />
               )}

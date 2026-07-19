@@ -4,6 +4,7 @@ import { ArrowLeft, Gauge, Activity, Award } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { getFileUrl } from '@/lib/getFileUrl';
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
 export default function PublicCategoryDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -47,8 +48,9 @@ export default function PublicCategoryDetailPage() {
 
             <div className="space-y-4 relative z-10">
               {category.imageUrl && (
-                <img
+                <ImageWithFallback
                   src={getFileUrl(category.imageUrl)}
+                  fallbackType="category"
                   alt={category.name}
                   className="mb-6 aspect-[16/7] w-full rounded-2xl object-cover"
                 />

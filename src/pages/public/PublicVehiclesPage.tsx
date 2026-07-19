@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getFileUrl } from '@/lib/getFileUrl';
+import ImageWithFallback from '@/components/ui/ImageWithFallback';
 
 export default function PublicVehiclesPage() {
   const [search, setSearch] = useState('');
@@ -72,7 +73,7 @@ export default function PublicVehiclesPage() {
               {/* Image Box */}
               <div className="aspect-video bg-muted border border-border/80 rounded-xl overflow-hidden relative flex items-center justify-center mb-4">
                 {vehicle.imageUrl ? (
-                  <img src={getFileUrl(vehicle.imageUrl)} alt={vehicle.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <ImageWithFallback src={getFileUrl(vehicle.imageUrl)} fallbackType="vehicle" alt={vehicle.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 ) : (
                   <Car className="w-12 h-12 text-muted-foreground" />
                 )}
